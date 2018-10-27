@@ -1,0 +1,16 @@
+{
+  "wifi": {
+    "mode": 0,
+    "ssid":"",
+    "password":""
+  },
+  "mqtt":  {
+    "server":"",
+    "user":"",
+    "password": "",
+    "port":1883
+  },
+  "ntp":{
+    "tz":7200
+  }
+}

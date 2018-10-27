@@ -6,9 +6,7 @@
 
 
 
-WifiHandler::WifiHandler(char *ssid, char * password) {
-    this->ssid = ssid;
-    this->password = password;
+WifiHandler::WifiHandler() {
     espClient = new WiFiClient();
 }
 
@@ -18,7 +16,7 @@ WifiHandler::~WifiHandler() {
 }
 
 
-void WifiHandler::setup() {
+void WifiHandler::setup(const char *ssid, const char * password) {
 
     delay(10);
     // We start by connecting to a WiFi network
@@ -26,7 +24,7 @@ void WifiHandler::setup() {
     Serial.print("Connecting to ");
     Serial.println(ssid);
 
-    WiFi.begin(this->ssid,this->password);
+    WiFi.begin(ssid,password);
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);

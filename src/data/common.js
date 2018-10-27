@@ -14,29 +14,25 @@ connection.onclose = function(){
 
 
 function RelayControl() {
-
-    // Get the Relay checkbox
     var checkBox = document.getElementById("relay");
-
-    // If the checkbox is checked, display the output text
-    var cmd = '#relay=';
+    var cmd = new Object();
+    cmd.cmd = "relay";
     if (checkBox.checked == true){
-        cmd= cmd+"1";
+        cmd.state = true;
     } else {
-        cmd= cmd+"0";
+        cmd.state = false;
     }
-
-    console.log('Relay: ' + cmd);
-    connection.send(cmd);
+    var json = JSON.stringify(cmd);
+    console.log(json);
+    connection.send(json);
 }
-
 
 function restartBoard() {
     var r =  confirm('Are you sure you want to restart?')
     if (r == true) {
-        var cmd = '#restart=1';
-        console.log(cmd);
-        connection.send(cmd);
+        var cmd = new Object();
+        cmd.cmd = "restart";
+        connection.send(JSON.stringify(cmd));
     }
 
 }

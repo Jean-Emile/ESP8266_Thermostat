@@ -15,18 +15,15 @@
 class WifiHandler
 {
 public:
-    WifiHandler(char *ssid, char * password);
+    WifiHandler();
     ~WifiHandler();
 
-    void setup();
+    void setup(const char *ssid, const char * password);
     void update();
     WiFiClient& getClient();
 
 private:
     MDNSResponder mdns;
     WiFiClient *espClient;
-    char *ssid;
-    char * password;
-
 };
 #endif //ESP8266_RELAY_BOARD_ARDUINO_WIFIHANDLER_H

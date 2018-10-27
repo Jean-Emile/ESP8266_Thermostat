@@ -27,46 +27,101 @@
 #include "WebServerHandler.h"
 #include "OtaHandler.h"
 #include "SpiffsHandler.h"
+#include "Sensors.h"
 
-WifiHandler wifiHandler("","");
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+Sensors sensors(timeClient);
+SpiffsHandler spiffsHandler;
+WifiHandler wifiHandler;
 Relay relay;
-Thermostat thermostat(relay);
-RF69Handler rf69Handler;
-WebSocketHandler webSocketHandler(thermostat,relay);
-MqttHandler mqttHandler("", "","", 8883, wifiHandler);
+Thermostat thermostat(timeClient,sensors,relay);
+RF69Handler rf69Handler(sensors);
+WebSocketHandler webSocketHandler(sensors,spiffsHandler,thermostat,relay);
+MqttHandler mqttHandler(sensors,wifiHandler,thermostat);
 WebServerHandler webServerHandler;
 OtaHandler otaHandler;
-SpiffsHandler spiffsHandler;
 
-void Blink(byte PIN, int DELAY_MS)
-{
-    pinMode(PIN, OUTPUT);
-    digitalWrite(PIN,HIGH);
-    delay(DELAY_MS);
-    digitalWrite(PIN,LOW);
+
+void ledblink(int times, int lengthms, int pinnum) {
+    for (int x = 0; x < times; x++) {
+        digitalWrite(pinnum, HIGH);
+        delay(lengthms);
+        digitalWrite(pinnum, LOW);
+        delay(lengthms);
+    }
 }
+
+#define  PIN_BUTTON 0
+int current;         // Current state of the button
+long millis_held;    // How long the button was held (milliseconds)
+long secs_held;      // How long the button was held (seconds)
+long prev_secs_held; // How long the button was held in the previous check
+byte previous = HIGH;
+unsigned long firstTime; // how long since the button was first pressed
 
 
 void setup(void){
     Serial.begin(115200);
-    wifiHandler.setup();
+    digitalWrite(PIN_BUTTON, HIGH);
+    spiffsHandler.setup();
+    timeClient.begin();
+
+
+    spiffsHandler.loadConfiguration();
+    thermostat.loadConfiguration();
+    timeClient.setTimeOffset(spiffsHandler.tz); /// GMT +1 = 3600; GMT+2 7200, ..
+
+    wifiHandler.setup(spiffsHandler.ssid,spiffsHandler.wifiPassword);
     rf69Handler.setup();
     otaHandler.setup();
-    spiffsHandler.setup();
+
     relay.setup();
     webServerHandler.setup();
-    mqttHandler.setup();
+    mqttHandler.setup(spiffsHandler.mqttServer,
+                      spiffsHandler.mqttUser,
+                      spiffsHandler.mqttPassword,
+                      spiffsHandler.mqttPort);
     webSocketHandler.setup();
 }
 
 
-void loop(void){
+void loop(void) {
+    timeClient.update();
     wifiHandler.update();
     webSocketHandler.update();                           // constantly check for websocket events
     webServerHandler.update();                      // run the server
     otaHandler.update();
     rf69Handler.update();
     mqttHandler.update();
-    spiffsHandler.update();
     thermostat.update();
+
+    current = digitalRead(PIN_BUTTON);
+
+    // if the button state changes to pressed, remember the start time
+    if (current == LOW && previous == HIGH && (millis() - firstTime) > 200) {
+        firstTime = millis();
+    }
+
+    millis_held = (millis() - firstTime);
+    secs_held = millis_held / 1000;
+
+    if (millis_held > 50) {
+
+        if (current == LOW && secs_held > prev_secs_held) {
+            ledblink(1, 50, 16);
+        }
+        // check if the button was released since we last checked
+        if (current == HIGH && previous == LOW) {
+            if (secs_held >= 5) {
+
+                Serial.print("Setting soft-AP ... ");
+                Serial.println(WiFi.softAP("CELSIUS") ? "Ready" : "Failed!");
+                webServerHandler.setup();
+
+            }
+        }
+        previous = current;
+        prev_secs_held = secs_held;
+    }
 }

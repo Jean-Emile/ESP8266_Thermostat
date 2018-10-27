@@ -5,7 +5,8 @@
 #include "RF69Handler.h"
 
 
-RF69Handler::RF69Handler() {
+RF69Handler::RF69Handler(Sensors &sensors) {
+    this->sensors = &sensors;
     radio = new RFM69(RFM69_CS, RFM69_IRQ, IS_RFM69HCW, RFM69_IRQN);
     ackCount=0;
     packetCount = 0;

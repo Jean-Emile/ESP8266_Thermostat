@@ -15,8 +15,9 @@ public:
     void setup();
     void turnOn();
     void turnOff();
-    int getState();
+
+    bool getState();
 private:
-    int relayState;
+    bool relayState;
 };
 #endif //ESP8266_RELAY_BOARD_ARDUINO_RELAY_H

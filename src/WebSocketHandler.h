@@ -9,13 +9,14 @@
 
 #include <WebSocketsServer.h> // get it here https://github.com/Links2004/arduinoWebSockets
 #include <ArduinoJson.h> //  get it here  https://github.com/bblanchon/ArduinoJson ( 5.13.3)
+#include "SpiffsHandler.h"
 #include "Relay.h"
 #include "Thermostat.h"
 
 class WebSocketHandler
 {
 public:
-    WebSocketHandler(Thermostat &thermostat, Relay &relay);
+    WebSocketHandler(Sensors &Sensors,SpiffsHandler &spiffsHandler, Thermostat &thermostat, Relay &relay);
     ~WebSocketHandler();
 
     void setup();
@@ -25,7 +26,9 @@ public:
 private:
     WebSocketsServer *webSocket;
     Relay *relay;
+    Sensors *sensors;
     Thermostat *thermostat;
+    SpiffsHandler  *spiffsHandler;
 
 };
 

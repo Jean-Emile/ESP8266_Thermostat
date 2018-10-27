@@ -8,25 +8,30 @@
 #include <PubSubClient.h> // get it here: https://github.com/knolleary/pubsubclient.git
 
 #include "WifiHandler.h"
+#include "Thermostat.h"
+#include "Sensors.h"
 
 class MqttHandler
 {
 public:
-    MqttHandler(char* mqttServer,char *mqttUser, char *mqttPassword,int mqttPort, WifiHandler &wifiHandler);
+    MqttHandler(Sensors &sensors,WifiHandler &wifiHandler,Thermostat &thermostat);
     ~MqttHandler();
 
-    void setup();
+    void setup(const char* mqttServer,const char *mqttUser, const char *mqttPassword,int mqttPort);
     void reconnect();
     void update();
 
 private:
-PubSubClient *client;
-WifiHandler *wifiHandler;
-char* mqttServer;
-int mqttPort;
-char* mqttUser;
-char* mqttPassword;
-void callback(char* topic, byte* payload, unsigned int length);
+    PubSubClient *client;
+    WifiHandler *wifiHandler;
+    Thermostat *thermostat;
+    Sensors *sensors;
+    const char* mqttServer;
+    int mqttPort;
+    const char* mqttUser;
+    const char* mqttPassword;
+    void callback(char* topic, byte* payload, unsigned int length);
+    double timeRetry;
 
 };
 

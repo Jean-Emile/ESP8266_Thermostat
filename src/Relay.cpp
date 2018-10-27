@@ -6,35 +6,33 @@
 
 
 Relay::Relay() {
-    relayState=0;
-
+    relayState=false;
 }
 
 void Relay::setup() {
     pinMode(RELAY_PIN, OUTPUT);
-
+    digitalWrite(RELAY_PIN,LOW); // TODO: check if mandatory
 }
 
 
-int Relay::getState() {
+bool Relay::getState() {
     return relayState;
 }
 void Relay::turnOff() {
-    if (relayState == 1)
+    if (relayState == true)
     {
         digitalWrite(RELAY_PIN,LOW);
-        relayState=0;
+        relayState= false;
     }else
     {
         Serial.println("Already turned OFF");
     }
-
 }
 
 void Relay::turnOn() {
-    if(relayState == 0){
+    if(relayState == false){
         digitalWrite(RELAY_PIN,HIGH);
-        relayState=1;
+        relayState= true;
     }else
     {
         Serial.println("Already turned ON");

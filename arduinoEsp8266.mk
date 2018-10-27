@@ -97,16 +97,10 @@ else
   COMP_PATH := $$(ESP_ROOT)tools/xtensa-lx106-elf-gcc/*))
   ESPTOOL_PATH := $(lastword $(wildcard $(ESP_ROOT)tools/esptool/*))
   MKSPIFFS_PATH := $(lastword $(wildcard $(ESP_ROOT)tools/mkspiffs/*/mkspiffs))
-  $(info ==> $(COMP_PATH))
 endif
 ESP_LIBS = $(ESP_ROOT)/libraries
 SDK_ROOT = $(ESP_ROOT)/tools/sdk
 TOOLS_ROOT = $(ESP_ROOT)/tools
-
-$(info    ESP_LIBS is $(ESP_LIBS))
-$(info    SDK_ROOT is $(SDK_ROOT))
-$(info    TOOLS_ROOT is $(TOOLS_ROOT))
-
 
 ifeq ($(wildcard $(ESP_ROOT)/cores/$(CHIP)),)
   $(error $(ESP_ROOT) is not a vaild directory for $(CHIP))

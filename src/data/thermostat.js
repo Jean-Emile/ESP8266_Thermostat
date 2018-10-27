@@ -1,3 +1,4 @@
+// code adapted from Martin Harizanov project (https://github.com/mharizanov/ESP8266_Relay_Board)
 var now = new Date();
 var timenow = now.getHours() + (now.getMinutes() / 60);
 var days = {
@@ -12,9 +13,9 @@ var days = {
 };
 var today = days[now.getDay()];
 
-var connection = new WebSocket('ws://'+location.hostname+':81/', ['arduino']);
+var connection = new WebSocket('ws://esp8266.local:81/', ['arduino']);
 connection.onopen = function () {
-    connection.send('Connect ' + new Date());
+
 };
 connection.onerror = function (error) {
     console.log('WebSocket Error ', error);
@@ -22,48 +23,39 @@ connection.onerror = function (error) {
 connection.onmessage = function (e) {
     console.log('Server: ', e.data);
 
-    if(e.data["id"] == "thermostat_state"){
-        delete e.data["id"];
-        thermostat = e.data;
+    var json = JSON.parse(e.data);
+    if(json["cmd"] == "thermostat_state"){
+        delete json["cmd"];
+        thermostat = json;
+        thermostat.temperature/=100;
+        thermostat.humidity/=100;
         thermostat.manualsetpoint/=100;
-    }else if(e.data["id"] == "thermostat_schedule")
+
+    }else if(json["cmd"] == "thermostat_schedule")
     {
-        var schedule = {"mon":[{"s":0,"e":550,"sp":1950},{"s":550,"e":900,"sp":1950},{"s":900,"e":1700,"sp":1700},{"s":1700,"e":2400,"sp":1950}],
-            "tue":[{"s":0,"e":500,"sp":1950},{"s":500,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1750},{"s":1700,"e":2400,"sp":2000}],
-            "wed":[{"s":0,"e":500,"sp":1700},{"s":500,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1900},{"s":1700,"e":2400,"sp":2100}],
-            "thu":[{"s":0,"e":500,"sp":1700},{"s":500,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1900},{"s":1700,"e":2400,"sp":2100}],
-            "fri":[{"s":0,"e":500,"sp":1700},{"s":500,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1900},{"s":1700,"e":2400,"sp":2100}],
-            "sat":[{"s":0,"e":500,"sp":1700},{"s":500,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1900},{"s":1700,"e":2400,"sp":2100}],
-            "sun":[{"s":0,"e":500,"sp":1700},{"s":500,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1900},{"s":1700,"e":2400,"sp":1950}]
-        }
+
+        delete json["cmd"];
+        schedule = json;
 
         for (var d in schedule) {
             for (var z in schedule[d]) {
                 schedule[d][z].s /= 100;
                 schedule[d][z].e /= 100;
                 schedule[d][z].sp /= 100;
+               //console.log(d+" "+z+" "+schedule[d][z].s+" "+schedule[d][z].e+" "+schedule[d][z].sp)
+                draw_day_slider(d)
             }
         }
+
+
     }
+    update();
+    updateclock();
 };
 connection.onclose = function(){
     console.log('WebSocket connection closed');
 };
 
-
-var connection = new WebSocket('ws://'+location.hostname+':81/', ['arduino']);
-connection.onopen = function () {
-    connection.send('Connect ' + new Date());
-};
-connection.onerror = function (error) {
-    console.log('WebSocket Error ', error);
-};
-connection.onmessage = function (e) {
-    console.log('Server: ', e.data);
-};
-connection.onclose = function(){
-    console.log('WebSocket connection closed');
-};
 
 
 //=================================================
@@ -71,54 +63,22 @@ connection.onclose = function(){
 //=================================================
 
 var visibleFlag = 1;
-var setpoint = 21;
 var unit ="&deg;C";
 var statusMsg = false;
 var connected = false;
 var doingsave = false;
 
 var thermostat = {
-    temperature: "21",
-    humidity: "50",
+    temperature: 0,
+    humidity: 0,
     relayState: 0,
     opmode: 0,
-    state: 0,
-    manualsetpoint: 21,
+    state: false,
+    manualsetpoint: 0,
     mode: 0
 };
 
 var schedule = {};
-
-var day1 = [{
-    s: 0,
-    e: 6,
-    sp: 8
-}, {
-    s: 6,
-    e: 9,
-    sp: 18
-}, {
-    s: 9,
-    e: 17,
-    sp: 12
-}, {
-    s: 17,
-    e: 22,
-    sp: 18
-}, {
-    s: 22,
-    e: 24,
-    sp: 8
-}];
-
-schedule['mon'] = JSON.parse(JSON.stringify(day1));
-schedule['tue'] = JSON.parse(JSON.stringify(day1));
-schedule['wed'] = JSON.parse(JSON.stringify(day1));
-schedule['thu'] = JSON.parse(JSON.stringify(day1));
-schedule['fri'] = JSON.parse(JSON.stringify(day1));
-schedule['sat'] = JSON.parse(JSON.stringify(day1));
-schedule['sun'] = JSON.parse(JSON.stringify(day1));
-
 
 var maxc = 24;
 var minc = 5;
@@ -146,9 +106,9 @@ $("#unit").html(unit);
 setpoint = thermostat.manualsetpoint;
 $(".zone-setpoint").html(setpoint.toFixed(1) + unit);
 
-update();
-updateclock();
-setInterval(updateclock, 1000);
+// update();
+// updateclock();
+// setInterval(updateclock, 1000);
 
 function updateclock() {
     now = new Date();
@@ -251,19 +211,18 @@ function update() {
 }
 
 $("#toggle").click(function () {
-    thermostat.state++;
-    if (thermostat.state > 1) thermostat.state = 0;
-    if (thermostat.state == 1) {
+
+    if (thermostat.state == 0) {
+        thermostat.state = 1;
         $("#toggle").html("ON");
         $(this).css("background-color", "#ff9600");
-    }
-    if (thermostat.state === 0) {
+    }else {
+        thermostat.state =0;
         $("#toggle").html("OFF");
         $(this).css("background-color", "#555");
     }
 
-    //save("tx/heating",thermostat.state+","+parseInt(setpoint*100));
-    save("thermostat_state", thermostat.state.toString());
+    save("thermostat_state", thermostat.state);
 });
 
 $("#zone-setpoint-dec").click(function () {
@@ -324,7 +283,7 @@ $("body").on("mousedown", ".slider-button", function (e) {
 $("body").mouseup(function (e) {
     mousedown = 0;
     if (changed) {
-        save("thermostat_schedule", "{\"" + day + "\":" + JSON.stringify(calc_schedule_esp(schedule[day])) + "}");
+        save("thermostat_schedule", day);
         changed = 0;
     }
 });
@@ -343,7 +302,7 @@ $("body").on("touchstart", ".slider-button", function (e) {
 $("body").on("touchend", ".slider-button", function (e) {
     mousedown = 0;
     if (changed) {
-        save("thermostat_schedule", "{\"" + day + "\":" + JSON.stringify(calc_schedule_esp(schedule[day])) + "}");
+        save("thermostat_schedule", day);
         changed = 0;
     }
 });
@@ -367,7 +326,7 @@ $("body").on("click", ".slider-button", function () {
         schedule[day].splice(key, 1);
         draw_day_slider(day);
         //editmode = 'move';
-        save("thermostat_schedule", "{\"" + day + "\":" + JSON.stringify(calc_schedule_esp(schedule[day])) + "}");
+        save("thermostat_schedule", day);
     }
 });
 
@@ -394,7 +353,7 @@ $("body").on("click", ".slider-segment", function (e) {
 
             draw_day_slider(day);
             $("#average_temperature").html(calc_average_schedule_temperature().toFixed(1));
-            save("thermostat_schedule", "{\"" + day + "\":" + JSON.stringify(calc_schedule_esp(schedule[day])) + "}");
+            save("thermostat_schedule", day);
         }
         //editmode = 'move';
     } else if (editmode == 'move') {
@@ -456,7 +415,7 @@ $("body").on("click", "#slider-segment-ok", function () {
     }
     $("#slider-segment-end").val(format_time(schedule[day][key].e));
     update_slider_ui(day, key + 1);
-    save("thermostat_schedule", "{\"" + day + "\":" + JSON.stringify(calc_schedule_esp(schedule[day])) + "}");
+    save("thermostat_schedule", day);
     updateclock();
 
 });
@@ -472,7 +431,7 @@ $("#slider-segment-movepos-ok").click(function () {
     }
     $("#slider-segment-time").val(format_time(schedule[day][key].s));
     update_slider_ui(day, key);
-    save("thermostat_schedule", "{\"" + day + "\":" + JSON.stringify(calc_schedule_esp(schedule[day])) + "}");
+    save("thermostat_schedule", day);
 });
 
 $("#mode-split").click(function () {
@@ -546,7 +505,7 @@ function color_map(temperature) {
 		case 3: r=0;g=255-Y;b=255;break;
 		case 4: r=0;g=0;b=255;break;
 	}
-     
+
 	*/
     var f = (temperature - minc) / (maxc - minc);
     var a = (1 - f);
@@ -631,8 +590,39 @@ function checkVisibility() {
 }
 
 function save(param, payload) {
+    console.log("Saving "+param+" "+payload)
     doingsave=true;
-    console.log(payload)
+
+    var cmd = new Object();
+    cmd.cmd = param;
+    if(param == "thermostat_state"){
+        cmd.state = payload;
+    }else if(param =="thermostat_manualsetpoint"){
+        cmd.temperature = payload;
+    }else if(param =="thermostat_schedule"){
+        // TODO:
+        var strtointdays = {
+            'mon': 0,
+            'tue': 1,
+            'wed': 2,
+            'thu': 3,
+            'fri': 4,
+            'sat': 5,
+            'sun': 6
+        };
+
+        cmd["day"]= strtointdays[day];
+        cmd["schedule"] = calc_schedule_esp(schedule[day]);
+    }else if(param == "thermostat_mode"){
+
+        cmd.mode = payload;
+    }
+
+    var json = JSON.stringify(cmd);
+    console.log(json);
+
+    connection.send(json);
+
     // $.ajax({
     //     type: 'POST',
     //     url: "thermostat.cgi?param=" + param,

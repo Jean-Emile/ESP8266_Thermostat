@@ -1,0 +1,31 @@
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <script src="wifi.js" type="text/javascript"></script>
+</head>
+<body>
+<div>
+    <div>
+        <h1>WiFi setup</h1>
+        <div>
+
+            <div>
+                <div>
+                    <label>WiFi Networks:</label>
+
+                    <div id="aps">Scanning...</div>
+                </div>
+                <div>
+                    <label for="pass">WiFi Password:</label>
+                    <input type="text" id="pass" name="pass" placeholder="Type WiFi password...">
+                </div>
+                <button type="button" onClick="parent.location='/'">Back</button>
+                <div><button href="#" onclick="saveWifiConf();" id="save">Save WiFi settings</button></div>
+            </div>
+
+        </div>
+    </div>
+
+</body>
+</html>
