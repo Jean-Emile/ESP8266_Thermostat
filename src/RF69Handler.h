@@ -11,7 +11,7 @@
 #include <RFM69_ATC.h>     //get it here: https://www.github.com/lowpowerlab/rfm69
 
 #include "Sensors.h"
-
+#include "MqttHandler.h"
 
 typedef struct __attribute__((__packed__)) Payload {                                                    // RFM RF payload datastructure
     uint16_t           nodeId; //store this nodeId
@@ -51,7 +51,7 @@ typedef struct __attribute__((__packed__)) Payload {                            
 class RF69Handler
 {
 public:
-    RF69Handler(Sensors &sensors);
+    RF69Handler(Sensors &sensors,MqttHandler &mqttHandler);
     ~RF69Handler();
 
     void setup();
@@ -63,6 +63,7 @@ private:
     byte ackCount;
     uint32_t packetCount;
     RFM69 *radio;
+    MqttHandler *mqttHandler;
 
 
 };

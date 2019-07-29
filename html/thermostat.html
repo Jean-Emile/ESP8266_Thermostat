@@ -11,6 +11,7 @@
 <div class="block">
     <button id="toggle" style="float:right">OFF</button>
     <div class="zone-title">Thermostat</div>
+    <div id="connectionState">Waiting...</div>
     <hr>
     <div style="text-align:center">
         <p>SET POINT:</p>
@@ -27,13 +28,13 @@
                 </td>
             </tr>
         </table>
-        <p>Temperature: <span class="zone-temperature"></span>
-            <span style="display:none" class="humidity">, Humidity: <span id="zone-humidity"></span></span></p>
+        <div id="sensors">Waiting...</div>
     </div>
     <button id="manual_thermostat" class="btn-small btn-left thermostatmode">Manual</button>
     <button id="scheduled_thermostat" class="btn-small btn-right thermostatmode">Schedule</button>
+    <button id="scheduled_auto" class="btn-small btn-right thermostatmode">Auto</button>
     <div style="font-size:28px">Schedule</div>
-    <div id="datetime"></div>
+    <div id="boardtime"></div>
     <hr>
     <div id="slider-segment-blank">
         <div id="slider-segment-block" style="display:none">START:
@@ -65,6 +66,12 @@
     <p style="display:none">Schedule JSON: <span class="schedule_json"></span>
 
     </p>
+    <table>
+        <tr><td>Hysteresis high:</td><td><input type="text" name="thermostat1hysteresishigh" id="thermostat1hysteresishigh" value="" /> (in tenths of a degree, 50 means 0.5 degrees)</td></tr>
+        <tr><td>Hysteresis low:</td><td><input type="text" name="thermostat1hysteresislow" id="thermostat1hysteresislow" value="" /> (in tenths of a degree, 50 means 0.5 degrees)</td></tr>
+        <tr><td>  <button onclick="setHysteresis()" id="bthermostat1hysteres">Set</button></td><td>
+    </table>
+
 
 </div></div>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>

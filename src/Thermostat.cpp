@@ -3,54 +3,7 @@
 //
 
 #include "Thermostat.h"
-
-// NOTE: this code is adapted from Martin Harizanov project (https://github.com/mharizanov/ESP8266_Relay_Board)
-
-// TODO remove that
-#define IS_LEAP(year) (year%4 == 0)
-#define SEC_IN_NON_LEAP (86400*365)
-#define SEC_IN_LEAP (86400*366)
-#define SEC_IN_YEAR(year) (IS_LEAP(year) ? SEC_IN_LEAP : SEC_IN_NON_LEAP)
-
-char buf[30];
-
-unsigned char calendar [] = {31, 28, 31, 30,31, 30, 31, 31,30, 31, 30, 31};
-unsigned char calendar_leap [] = {31, 29, 31, 30,31, 30, 31, 31,30, 31, 30, 31};
-
-unsigned char *get_calendar(int year) {
-    return IS_LEAP(year) ? calendar_leap : calendar;
-}
-
-int get_year(unsigned long *t) {
-    int year=1970;
-    while(*t>SEC_IN_YEAR(year)) {
-        *t-=SEC_IN_YEAR(year);
-        year++;
-    }
-    return year;
-}
-
-int get_month(unsigned long *t, int year) {
-    unsigned char *cal = get_calendar(year);
-    int i=0;
-    while(*t > cal[i]*86400) {
-        *t-=cal[i]*86400;
-        i++;
-    }
-    return i+1;
-}
-
-static int wd(int year, int month, int day) {
-    size_t JND =                                                     \
-          day                                                      \
-        + ((153 * (month + 12 * ((14 - month) / 12) - 3) + 2) / 5) \
-        + (365 * (year + 4800 - ((14 - month) / 12)))              \
-        + ((year + 4800 - ((14 - month) / 12)) / 4)                \
-        - ((year + 4800 - ((14 - month) / 12)) / 100)              \
-        + ((year + 4800 - ((14 - month) / 12)) / 400)              \
-        - 32045;
-    return (int)JND % 7;
-}
+#include "Gsender.h"
 
 Thermostat::Thermostat(NTPClient &ntpClient,Sensors &sensors, Relay &relay)
 {
@@ -59,27 +12,22 @@ Thermostat::Thermostat(NTPClient &ntpClient,Sensors &sensors, Relay &relay)
     this->ntpClient = &ntpClient;
     turnOff();
     this->thermostatMode = THERMOSTAT_MANUAL;
-    // TODO load
     thermostatManualsetpoint=2100;
+    selectedSensor = 0;
     lastUpdate=millis();
-
-
-
-
-
 }
 Thermostat::~Thermostat() {
 
 
 }
 
-void Thermostat::setManualTemperature(int temp) {
+void Thermostat::setManualSetPoint(int temp) {
     thermostatManualsetpoint = temp;
     Serial.print("ManualSetPoint");
     Serial.println(thermostatManualsetpoint);
 }
 
-int Thermostat::getThermostatMode(){
+int Thermostat::getMode(){
     return thermostatMode;
 }
 
@@ -92,13 +40,29 @@ void Thermostat::setMode(int mode){
     }
 
 }
-int Thermostat::getThermostatState(){
+int Thermostat::getState(){
     return thermostatState;
 }
 
-int Thermostat::getThermostatManuelSetPoint(){
+int Thermostat::getManuelSetPoint(){
     return thermostatManualsetpoint;
 }
+void Thermostat::setHysteresisLow(int temp){
+    this->thermostatHysteresisLow = temp;
+}
+void Thermostat::setHysteresisHigh(int temp){
+    this->thermostatHysteresisHigh = temp;
+}
+
+int Thermostat::getSelectedSensor(){
+    return this->selectedSensor;
+}
+void Thermostat::setSelectedSensor(int id){
+    if(id >=0 && id <= MAX_SENSORS){
+        this->selectedSensor = id;
+    }
+}
+
 
 void Thermostat::turnOn(){
     thermostatState = THERMOSTAT_ON;
@@ -114,46 +78,75 @@ void Thermostat::update() {
     if((millis() > lastUpdate + 20000))
     {
         lastUpdate = millis();
-        // TODO
-        int Treading=this->sensors->readSensor(0).temperature;
+        Serial.println(ntpClient->getFormattedTime());
 
-        if(thermostatState == THERMOSTAT_OFF) {
-            Serial.println("Thermostat switched off, abandoning routine.");
-        } else if(thermostatMode == THERMOSTAT_MANUAL) {
-            handle(Treading, thermostatManualsetpoint);
-        }else if(thermostatMode ==THERMOSTAT_SCHEDULE) {
+        unsigned long epoch = ntpClient->getEpochTime();
+        int dow=(ntpClient->getDay()+6)%7;
+        unsigned int hour=ntpClient->getHours();
+        int min = ntpClient->getMinutes();
+        int minadj = (min*100/60);
+        int currtime = hour*100+minadj;
+        Serial.printf("DOW=%d currtime=%d \n",dow, currtime);
 
-            unsigned long epoch = ntpClient->getEpochTime();
-            // TODO
-            //timeClient->getHours();
-            int year=get_year(&epoch);
-            int month=get_month(&epoch,year);
-            int day=day=1+(epoch/86400);
-            int dow=wd(year,month,day);
-            epoch=epoch%86400;
-            unsigned int hour=epoch/3600;
-            epoch%=3600;
-            unsigned int min=epoch/60;
-            int minadj = (min*100/60);
-            int currtime = hour*100+minadj;
+        if(this->sensors->readSensor(getSelectedSensor()).active){
 
-            for(int sched=0; sched<8 && thermostatSchedule.weekSched[dow].daySched[sched].active==1; sched++) {
-                if(currtime >= thermostatSchedule.weekSched[dow].daySched[sched].start && currtime < thermostatSchedule.weekSched[dow].daySched[sched].end) {
+            int Treading=this->sensors->readSensor(getSelectedSensor()).temperature;
 
-                    Serial.printf("Current schedule (%d) setpoint is: %d\n",sched,thermostatSchedule.weekSched[dow].daySched[sched].setpoint);
-                    handle(Treading, thermostatSchedule.weekSched[dow].daySched[sched].setpoint);
+            if(thermostatState == THERMOSTAT_OFF)
+            {
+                Serial.println("Thermostat switched off, abandoning routine.");
+            }
+            else
+            {
+
+                if(epoch - this->sensors->readSensor(getSelectedSensor()).lastUpdate  >= 1000){
+
+                    Gsender *gsender = Gsender::Instance();    // Getting pointer to class instance
+
+                    if(gsender->Subject("Stale Measurement!")->Send("jedartois@gmail.com", "The selected sensor value is outdated")) {
+                        Serial.println("Message send.");
+                    } else {
+                        Serial.print("Error sending message: ");
+                        Serial.println(gsender->getError());
+                    }
+                }
+
+                if(thermostatMode == THERMOSTAT_MANUAL) {
+
+                    handle(Treading, thermostatManualsetpoint);
+
+                }else if(thermostatMode ==THERMOSTAT_SCHEDULE) {
+
+                    for(int sched=0; sched<8 && thermostatSchedule.weekSched[dow].daySched[sched].active==1; sched++) {
+
+                        if(currtime >= thermostatSchedule.weekSched[dow].daySched[sched].start && currtime < thermostatSchedule.weekSched[dow].daySched[sched].end) {
+
+                            Serial.printf("Current schedule (%d) setpoint is: %d %d %d\n",sched,thermostatSchedule.weekSched[dow].daySched[sched].setpoint, thermostatSchedule.weekSched[dow].daySched[sched].start,thermostatSchedule.weekSched[dow].daySched[sched].end);
+                            handle(Treading, thermostatSchedule.weekSched[dow].daySched[sched].setpoint);
+                        }
+                    }
+
+
+                }else if(thermostatMode ==THEMOSTAT_IA) {
+
+                    // TODO
                 }
             }
 
-        }else if(thermostatMode ==THEMOSTAT_IA) {
+        } else
+        {
+            Serial.println("Thermostat switched off, no valid Temperature.");
+            Gsender *gsender = Gsender::Instance();    // Getting pointer to class instance
 
-            // TODO
+            if(gsender->Subject("Stale Measurement!")->Send("jedartois@gmail.com", "The selected sensor value is outdated")) {
+                Serial.println("Message send.");
+            } else {
+                Serial.print("Error sending message: ");
+                Serial.println(gsender->getError());
+            }
         }
 
-
-
     }
-
 
 }
 
@@ -171,38 +164,148 @@ void Thermostat::handle(int current_t, int setpoint) {
 
 bool Thermostat::loadConfiguration(){
 
+
+    File configThermo = SPIFFS.open("/thermostat.json", "r");
+    if (!configThermo) {
+        Serial.println("Failed to open config file");
+        return false;
+    }
+
+    size_t size = configThermo.size();
+    if (size > 200) {
+        Serial.printf("Config file size is too large %d\n ", size);
+        return false;
+    }
+
+    // Allocate a buffer to store contents of the file.
+    std::unique_ptr<char[]> bufConfig(new char[size]);
+    configThermo.readBytes(bufConfig.get(), size);
+
+    DynamicJsonBuffer jsonBufferConfig;
+    JsonObject& config = jsonBufferConfig.parseObject(bufConfig.get());
+    int mode = config["mode"];
+    int manualsetpoint = config["manualsetpoint"];
+    int state = config["state"];
+    int relay = config["relay"];
+    int hysteresLow = config["hysteresLow"];
+    int hysteresHigh = config["hysteresHigh"];
+    int selectedSensor = config["selectedSensor"];
+
+    setMode(mode);
+    setManualSetPoint(manualsetpoint);
+    setHysteresisHigh(hysteresHigh);
+    setHysteresisLow(hysteresLow);
+    setSelectedSensor(selectedSensor);
+
+    if(state == 1){
+        turnOn();
+    }else{
+        turnOff();
+    }
+
+    if(relay == 1){
+        this->relay->turnOn();
+    }else{
+        this->relay->turnOff();
+    }
+
     File configFile = SPIFFS.open("/schedule.json", "r");
     if (!configFile) {
         Serial.println("Failed to open config file");
         return false;
     }
 
-    size_t size = configFile.size();
-    if (size > 1500) {
+    size = configFile.size();
+    if (size > 1800) {
         Serial.printf("Schedule Config file size is too large %f\n ", size);
         return false;
     }
-    Serial.println(size);
+
 
     // Allocate a buffer to store contents of the file.
     std::unique_ptr<char[]> buf(new char[size]);
 
     configFile.readBytes(buf.get(), size);
     DynamicJsonBuffer jsonBuffer;
-    JsonObject& config = jsonBuffer.parseObject(buf.get());
+    JsonObject& scheduleJson = jsonBuffer.parseObject(buf.get());
 
-    if (!config.success()) {
+    if (!scheduleJson.success()) {
         Serial.println("Failed to parse config file");
         return false;
     }
 
+    for(int dow=0; dow<7; dow++) {
+        JsonArray& schedule = scheduleJson[String(dow)].asArray();
+        int i=0;
+        for (auto& row : schedule) {
+            // TODO: check type
+            int start = row["s"];
+            int end = row["e"];
+            int sp = row["sp"];
 
-    JsonArray& days = config["schedule"].asArray();
-    Serial.print(days.size());
-    for (String day : days) {
-        Serial.println(day);
+            if(i < 8){
+                thermostatSchedule.weekSched[dow].daySched[i].start=start; //0am
+                thermostatSchedule.weekSched[dow].daySched[i].end=end; //6am, hours are * 100
+                thermostatSchedule.weekSched[dow].daySched[i].setpoint=sp; //10.0*C
+                thermostatSchedule.weekSched[dow].daySched[i].active=1;
+                i++;
+            }
+
+        }
     }
+    return true;
 }
-bool Thermostat::saveConfiguration(){
+bool Thermostat::saveConfiguration(int target){
 
+    // TODO: only update in case of changes to save FLASH
+
+    if(target == SCHEDULE_CONFIG){
+
+        DynamicJsonBuffer jsonBufferThermostatSchedule;
+        JsonObject& jsonThermostatSchedule = jsonBufferThermostatSchedule.createObject();
+
+        for(int dow=0; dow<7; dow++) {
+            JsonArray& jsonDow = jsonThermostatSchedule.createNestedArray(String(dow));
+
+            for(int sched=0; sched<8 && thermostatSchedule.weekSched[dow].daySched[sched].active==1; sched++) {
+                JsonObject& zone = jsonDow.createNestedObject();
+                zone["s"] = thermostatSchedule.weekSched[dow].daySched[sched].start;
+                zone["e"] = thermostatSchedule.weekSched[dow].daySched[sched].end;
+                zone["sp"] = thermostatSchedule.weekSched[dow].daySched[sched].setpoint;
+            }
+        }
+        File scheduleFile = SPIFFS.open("/schedule.json", "w");
+        jsonThermostatSchedule.printTo(scheduleFile);
+        scheduleFile.close();
+        return true;
+    }else if(target == THERMOSTAT_CONFIG) {
+
+        StaticJsonBuffer<500> jsonBuffer;
+        JsonObject &thermoConfig = jsonBuffer.createObject();
+
+        thermoConfig["state"] = getState();
+        thermoConfig["manualsetpoint"] = getManuelSetPoint();
+        thermoConfig["mode"] = getMode();
+        thermoConfig["hysteresLow"] = getHysteresisLow();
+        thermoConfig["hysteresHigh"] = getHysteresisHigh();
+        thermoConfig["selectedSensor"] = getSelectedSensor();
+
+        File thermostatFile = SPIFFS.open("/thermostat.json", "w");
+        thermoConfig.printTo(thermostatFile);
+        thermostatFile.close();
+        return true;
+
+    }
+    return false;
 }
+
+int Thermostat::getHysteresisLow(){
+    return thermostatHysteresisLow;
+}
+int Thermostat::getHysteresisHigh(){
+    return thermostatHysteresisHigh;
+}
+
+
+
+

@@ -20,10 +20,21 @@ MqttHandler::~MqttHandler(){
     if (client != NULL)
         delete  client;
 }
+boolean MqttHandler::publish(const char* topic, const char* payload){
+    return client->publish(topic, payload);
+}
+
 void MqttHandler::reconnect() {
 
     if (!client->connected() &&  (millis() > timeRetry + 5000)) {
-        Serial.print("Attempting MQTT connection...");
+        Serial.print("Attempting MQTT connection... ");
+        Serial.print(this->mqttServer);
+        Serial.print(" ");
+        Serial.print(this->mqttUser);
+        Serial.print(" ");
+//        Serial.print(this->mqttPassword);
+//        Serial.print(" ");
+        Serial.println(this->mqttPort);
         // Create a random client ID
         String clientId = "ESP8266Client-";
         clientId += String(random(0xffff), HEX);
@@ -35,9 +46,7 @@ void MqttHandler::reconnect() {
             client->subscribe(TOPIC_THERMOSTAT_STATE);
             client->subscribe(TOPIC_THERMOSTAT_MANUAL_SET_POINT);
 
-            //client->subscribe("emon/#");
-            client->subscribe("emon/emonth6/temperature");
-            client->subscribe("emon/emonth6/humidity");
+            client->subscribe("emon/#");
 
         } else {
             Serial.print("failed, rc=");
@@ -79,22 +88,48 @@ void MqttHandler::update() {
 
 void MqttHandler::callback(char* topic, byte* payload, unsigned int length) {
     char message_buff[10];
-    Serial.print("Message arrived [");
-    Serial.print(topic);
-    Serial.print("] ");
-    for (int i = 0; i < length; i++) {
-        Serial.print((char)payload[i]);
+    // Serial.print("Message arrived [");
+//    Serial.print(topic);
+    //  Serial.print("] ");
+    for (int i = 0; i < (int)length; i++) {
+        //  Serial.print((char)payload[i]);
         message_buff[i] = payload[i];
     }
-    Serial.println();
+    //   Serial.println();
     message_buff[length] = '\0';
     String data = String(message_buff);
 
-    if (strcmp(topic,"emon/emonth6/temperature")==0){
-        sensors->updateTemperature(0,(int)(data.toFloat()*100));
-    }else if (strcmp(topic,"emon/emonth6/humidity") ==0) {
-        sensors->updateHumidity(0,(int)(data.toFloat()*100));
-    } else if (strcmp(topic,TOPIC_THERMOSTAT_MODE)==0)
+    int nodeId = 0;
+    char sensorId[32];
+
+    if (sscanf(topic, "emon/emonth%d/%s", &nodeId, sensorId) == 2) {
+        //NOTE: If no valid conversion could be performed because the String doesn’t start with a digit, a zero is returned. Data type: float.
+
+        Serial.printf("nodeID %d (%s) %d \r\n", nodeId, sensorId);
+
+        if (strcmp(sensorId, "temperature") == 0) {
+            sensors->updateValue(nodeId, SENSOR_TYPE_TEMPERATURE, (int) (data.toFloat() * 100));
+        } else if (strcmp(sensorId, "humidity") == 0) {
+            sensors->updateValue(nodeId, SENSOR_TYPE_HUMIDITY, (int) (data.toFloat() * 100));
+        } else if (strcmp(sensorId, "battery") == 0) {
+            sensors->updateValue(nodeId, SENSOR_TYPE_VOLTAGE, (int) (data.toFloat() * 100));
+        } else if (strcmp(sensorId, "rssi") == 0) {
+
+            sensors->updateValue(nodeId, SENSOR_TYPE_RSSI, (int) (data.toInt()));
+        } else {
+            Serial.printf("The Sensor=%s is ignored \r\n", topic);
+        }
+
+    } else if (sscanf(topic, "emon/emontx%d/%s", &nodeId, sensorId) == 2){
+//        if (strcmp(sensorId, "power1") == 0) {
+//            sensors->updateValue(nodeId, SENSOR_TYPE_POWER, (int) (data.toInt()));
+//        }else if (strcmp(sensorId, "battery") == 0) {
+//            sensors->updateValue(nodeId, SENSOR_TYPE_VOLTAGE, (int) (data.toFloat() * 100));
+//        } else if (strcmp(sensorId, "rssi") == 0) {
+//            sensors->updateValue(nodeId, SENSOR_TYPE_RSSI, (int) (data.toInt()));
+//        }
+    }
+    else if (strcmp(topic,TOPIC_THERMOSTAT_MODE)==0)
     {
         if(data.equals("manual")){
             thermostat->setMode(THERMOSTAT_MANUAL);
@@ -110,10 +145,10 @@ void MqttHandler::callback(char* topic, byte* payload, unsigned int length) {
         }
     }else if(strcmp(topic, TOPIC_THERMOSTAT_MANUAL_SET_POINT) ==0){
         //TODO check its a INT
-        thermostat->setManualTemperature(data.toInt());
+        thermostat->setManualSetPoint(data.toInt());
     }else {
 
-        Serial.printf("The topic=%s is ignored", topic);
+        Serial.printf("The topic=%s is ignored \r\n", topic);
     }
 
 }

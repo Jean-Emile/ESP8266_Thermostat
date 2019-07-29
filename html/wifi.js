@@ -1,8 +1,16 @@
-var connection = new WebSocket('ws://esp8266.local:81/', ['arduino']);
+
+var wb_url = 'ws://esp8266.local:81/'
+var connection = new WebSocket(wb_url);
+connection.onopen = function () {
+    console.log("connected...");
+    updateclock();
+    setStatus("Connected",5,0);
+
+};
 
 connection.onopen = function () {
     var cmd = new Object();
-    cmd.cmd = "scanwifi";
+    cmd.event = "do_wifi_scan";
     var json = JSON.stringify(cmd);
     connection.send(json);
 
@@ -16,7 +24,8 @@ connection.onmessage = function (e) {
     console.log('Server: ', e.data);
 
     var json = JSON.parse(e.data);
-    if( json["cmd"] == "wifiscan"){
+
+    if( json["event"] == "wifi_scan"){
         var networks = json["networks"];
         var aps = document.getElementById("aps");
         while(aps.firstChild){
@@ -78,6 +87,6 @@ function saveWifiConf()
 {
     var ssid =  getSelectedEssid();
     var password = document.getElementById("pass");
-
+    // TODO send
 
 }

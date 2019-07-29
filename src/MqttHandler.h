@@ -20,7 +20,7 @@ public:
     void setup(const char* mqttServer,const char *mqttUser, const char *mqttPassword,int mqttPort);
     void reconnect();
     void update();
-
+    boolean publish(const char* topic, const char* payload);
 private:
     PubSubClient *client;
     WifiHandler *wifiHandler;
@@ -31,6 +31,7 @@ private:
     const char* mqttUser;
     const char* mqttPassword;
     void callback(char* topic, byte* payload, unsigned int length);
+
     double timeRetry;
 
 };

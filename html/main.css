@@ -13,7 +13,7 @@ body {
 
 .block {
     margin: 0px auto;
-    max-width:392px;
+    max-width:600px;
     padding:20px;
     margin-top:50px;
     box-shadow: 0px 1px 10px rgba(0, 0, 0, 0.1);
