@@ -11,30 +11,63 @@ var days = {
     6: 'sat',
     7: 'sun'
 };
+// FIXME
+function getName(id) {
+    if(id == 6){
+        return "Elisa"
+    }else if(id == 7){
+        return "Salon"
+    }else if(id == 0){
+        return "Cuisine";
+    }else
+    {
+        return "Node_"+id;
+    }
+
+}
+
+function setState(msg) {
+    var connectionState = document.getElementById("connectionState");
+    connectionState.innerHTML =msg;
+}
 var today = days[now.getDay()];
 
-var connection = new WebSocket('ws://esp8266.local:81/', ['arduino']);
+var wb_url = 'ws://casa.powet.eu:65530/'; // esp8266.local
+
+var connection = new WebSocket(wb_url);
 connection.onopen = function () {
+    console.log("connected...");
+    updateclock();
+    setState("connected");
 
 };
 connection.onerror = function (error) {
     console.log('WebSocket Error ', error);
+    reconnect();
 };
 connection.onmessage = function (e) {
     console.log('Server: ', e.data);
 
+
     var json = JSON.parse(e.data);
-    if(json["cmd"] == "thermostat_state"){
-        delete json["cmd"];
+    // json =  {"event":"thermostat_schedule",
+    //     "mon":[{"s":0,"e":400,"sp":1000},{"s":400,"e":1100,"sp":1800},{"s":1100,"e":1700,"sp":1600},{"s":1700,"e":2200,"sp":2100},{"s":2200,"e":2400,"sp":1500}],
+    //     "tue":[{"s":0,"e":600,"sp":1000},{"s":600,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1600},{"s":1700,"e":2200,"sp":2100},{"s":2200,"e":2400,"sp":1500}],
+    //     "wed":[{"s":0,"e":600,"sp":1000},{"s":600,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1600},{"s":1700,"e":2200,"sp":2100},{"s":2200,"e":2400,"sp":1500}],
+    //     "thu":[{"s":0,"e":600,"sp":1000},{"s":600,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1600},{"s":1700,"e":2200,"sp":2100},{"s":2200,"e":2400,"sp":1500}],
+    //     "fri":[{"s":0,"e":600,"sp":1000},{"s":600,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1600},{"s":1700,"e":2200,"sp":2100},{"s":2200,"e":2300,"sp":2000},{"s":2300,"e":2400,"sp":1900}],
+    //     "sat":[{"s":0,"e":600,"sp":1000},{"s":600,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1600},{"s":1700,"e":1950,"sp":2100},{"s":1950,"e":2200,"sp":1500},{"s":2200,"e":2400,"sp":1500}],
+    //     "sun":[{"s":0,"e":600,"sp":1000},{"s":600,"e":900,"sp":1800},{"s":900,"e":1700,"sp":1600},{"s":1700,"e":2200,"sp":2100},{"s":2200,"e":2400,"sp":1500}]}
+
+    if(json["event"] == "thermostat_states"){
+        delete json["event"];
         thermostat = json;
-        thermostat.temperature/=100;
-        thermostat.humidity/=100;
         thermostat.manualsetpoint/=100;
 
-    }else if(json["cmd"] == "thermostat_schedule")
+    }else if(json["event"] == "thermostat_schedule")
     {
 
-        delete json["cmd"];
+        delete json["event"];
         schedule = json;
 
         for (var d in schedule) {
@@ -42,7 +75,7 @@ connection.onmessage = function (e) {
                 schedule[d][z].s /= 100;
                 schedule[d][z].e /= 100;
                 schedule[d][z].sp /= 100;
-               //console.log(d+" "+z+" "+schedule[d][z].s+" "+schedule[d][z].e+" "+schedule[d][z].sp)
+                //console.log(d+" "+z+" "+schedule[d][z].s+" "+schedule[d][z].e+" "+schedule[d][z].sp)
                 draw_day_slider(d)
             }
         }
@@ -50,11 +83,21 @@ connection.onmessage = function (e) {
 
     }
     update();
-    updateclock();
 };
 connection.onclose = function(){
     console.log('WebSocket connection closed');
+    reconnect();
 };
+
+autoReconnectInterval = 1*1000
+
+function reconnect(){
+    setTimeout(function(){
+        console.log("reconnecting...");
+        setState("reconnecting...");
+        connection = new WebSocket(wb_url);
+    },autoReconnectInterval);
+}
 
 
 
@@ -71,11 +114,16 @@ var doingsave = false;
 var thermostat = {
     temperature: 0,
     humidity: 0,
-    relayState: 0,
+    sensors: {},
+    relayState: false,
     opmode: 0,
     state: false,
     manualsetpoint: 0,
-    mode: 0
+    mode: 0,
+    boardtime: "",
+    selected: 0,
+    hysteresis_h:50,
+    hysteresis_l:50
 };
 
 var schedule = {};
@@ -95,119 +143,184 @@ var slider_height = $(".slider").height();
 var changed = 0;
 
 
-// if(thermostat.humidistat) {
-// 	unit="%";
-// 	$("#heating_thermostat").html("Humidify");
-// 	$("#cooling_thermostat").html("Dry");
-// }
-
 $("#unit").html(unit);
 
 setpoint = thermostat.manualsetpoint;
 $(".zone-setpoint").html(setpoint.toFixed(1) + unit);
 
-// update();
-// updateclock();
-// setInterval(updateclock, 1000);
+update();
+updateclock();
+setInterval(updateclock, 5000);
 
+
+function requestBoardStates() {
+    var cmd = new Object();
+    cmd.event = "get_thermostat_states";
+    var json = JSON.stringify(cmd);
+    connection.send(json);
+}
 function updateclock() {
-    now = new Date();
-    timenow = now.getHours() + (now.getMinutes() / 60);
-    today = days[now.getDay()];
+    if(connection.readyState === WebSocket.OPEN){
 
-    checkVisibility();
-
-    $("#datetime").html(today.toUpperCase() + " " + format_time(timenow));
-
-    if (thermostat.mode == 0) {
-        setpoint = thermostat.manualsetpoint;
-        $(".zone-setpoint").html(setpoint.toFixed(1) + unit);
+        requestBoardStates();
     }
 
-    var current_key = 0;
-    for (var z in schedule[today]) {
-        if (schedule[today][z].s <= timenow && schedule[today][z].e > timenow) {
-            if (thermostat.mode == 1) {
-                setpoint = schedule[today][z].sp * 1;
-                $(".zone-setpoint").html(setpoint.toFixed(1) + unit);
-                current_key = z;
-            }
-        }
-
-    }
-
-    // var sx = $(".slider[day=" + today + "]")[0].offsetLeft;
-    // var y = $(".slider[day=" + today + "]")[0].offsetTop;
-    // var x1 = sx + slider_width * (timenow / 24.0);
-    // var x2 = sx + slider_width * (schedule[today][current_key].s / 24.0);
-    //
-    // x2 = sx;
-    // $("#timemarker").css('top', y + "px");
-    // $("#timemarker").css('left', x2 + "px");
-    // $("#timemarker").css('width', (x1 - x2) + "px");
 
 }
 
-function setStatus(msg,dur,pri){	 // show msg on status bar
-    if(statusMsg == true){return};
-    statusMsg= true;
-    if(pri>0){
-        $("#statusView").toggleClass("statusViewAlert",true);
-        $("#statusView").toggleClass("statusView",false);
-    } else {
-        $("#statusView").toggleClass("statusView",true);
-        $("#statusView").toggleClass("statusViewAlert",false);
-    }
-    $("#statusView").show();
-    $("#statusView").html(msg);
-    dur = dur*1000;
-    if(dur >0){
-        setTimeout(function(){$("#statusView").hide(200);$("#statusView").html(""); statusMsg= false},dur)
-    }
-}
 
 function update() {
+    if(connection.readyState === WebSocket.OPEN){
 
-    if(!isNaN((Number(thermostat.humidity)).toFixed(1)))
-        $('.humidity').show();
+        if(!isNaN((Number(thermostat.humidity)).toFixed(1)))
+            $('.humidity').show();
 
-    $(".zone-temperature").html((Number(thermostat.temperature)).toFixed(1) + "&deg;C");
-    $("#zone-humidity").html((Number(thermostat.humidity)).toFixed(1) + "%");
 
-    if(thermostat.relayState === 0) {
-        $(".zone-setpoint").css("color", "#000000");
-    } else {
-        $(".zone-setpoint").css("color", "#f00000");
+        if(thermostat.relayState === false) {
+            $(".zone-setpoint").css("color", "#000000");
+        } else {
+            $(".zone-setpoint").css("color", "#f00000");
+        }
+
+        if (thermostat.state === 1) {
+            $("#toggle").html("ON");
+            $("#toggle").css("background-color", "#ff9600");
+        } else {
+            $("#toggle").html("OFF");
+            $("#toggle").css("background-color", "#555");
+        }
+
+        if (thermostat.mode === 0) {
+            $(".thermostatmode").css("background-color", "#555");
+            $("#manual_thermostat").css("background-color", "#ff9600");
+            $("#scheduled_thermostat").css("background-color", "#555");
+            $("#scheduled_auto").css("background-color", "#555");
+        } else if(thermostat.mode === 1) {
+            $(".thermostatmode").css("background-color", "#555");
+            $("#manual_thermostat").css("background-color", "#555");
+            $("#scheduled_thermostat").css("background-color", "#ff9600");
+            $("#scheduled_auto").css("background-color", "#555");
+        } else if(thermostat.mode === 2) {
+            $(".thermostatmode").css("background-color", "#555");
+            $("#manual_thermostat").css("background-color", "#555");
+            $("#scheduled_thermostat").css("background-color", "#555");
+            $("#scheduled_auto").css("background-color", "#ff9600");
+        }
+
+        if (thermostat.opmode == 0) {
+            $(".thermostatopmode").css("background-color", "#555");
+            $("#heating_thermostat").css("background-color", "#c00000");
+            $("#cooling_thermostat").css("background-color", "#555");
+        } else {
+            $(".thermostatopmode").css("background-color", "#555");
+            $("#heating_thermostat").css("background-color", "#555");
+            $("#cooling_thermostat").css("background-color", "#0000c0");
+        }
+
+        now = new Date();
+        timenow = now.getHours() + (now.getMinutes() / 60);
+        today = days[now.getDay()];
+
+        checkVisibility();
+
+
+        if (thermostat.mode == 0) {
+            setpoint = thermostat.manualsetpoint;
+            $(".zone-setpoint").html(setpoint.toFixed(1) + unit);
+        }
+
+        var aps = document.getElementById("boardtime");
+        aps.innerHTML =    "Board Time: "+thermostat.boardtime;
+
+
+        var thermostat1hysteresishigh = document.getElementById("thermostat1hysteresishigh");
+        thermostat1hysteresishigh.value = thermostat.hysteresis_h;
+
+        var thermostat1hysteresislow = document.getElementById("thermostat1hysteresislow");
+        thermostat1hysteresislow.value = thermostat.hysteresis_l;
+
+
+        var aps = document.getElementById("sensors");
+        while(aps.firstChild){
+            aps.removeChild(aps.firstChild);
+        }
+
+        for(var i in thermostat.sensors){
+            var sensor =  thermostat.sensors[i];
+
+            var sensorUpdate = new Date(0); // The 0 there is the key, which sets the date to the epoch
+            sensorUpdate.setUTCSeconds(sensor.lastUp);
+            sensorUpdate.setTime( sensorUpdate.getTime() + sensorUpdate.getTimezoneOffset()*60*1000 );
+
+            var difference =now.getTime() - sensorUpdate.getTime(); // This will give difference in milliseconds
+            var resultInSeconds = Math.round(difference / 6000);
+
+            var div=document.createElement("div");
+           div.setAttribute("align","left");
+
+            var checkbox = document.createElement('input');
+            checkbox.type = "checkbox";
+            checkbox.onclick = function(){
+               // this.onclick = null;
+                //var label = this.parentNode;
+               // label.removeChild(this);
+                //label.parentNode.removeChild(label);
+                var cmd = new Object();
+                cmd.event = "thermostat_selected";
+                cmd["sensorid"] = parseInt(this.value);
+                var json = JSON.stringify(cmd);
+                connection.send(json);
+                console.log(cmd);
+
+                requestBoardStates();
+
+            };
+            checkbox.id = "s_"+sensor.id;
+            checkbox.value = sensor.id;
+
+            var label = document.createElement('label');
+            label.for = "s_"+sensor.id;
+            label.innerHTML = ""+getName(sensor.id)+" Temperature: "+((Number(sensor.temp/100)).toFixed(1) + " Humidiy: "+
+                (Number(sensor.hum/100)).toFixed(1))+" % ("+resultInSeconds+" seconds) "+sensor.batt/100+"V RSSI "+sensor.rssi;
+
+
+            if(thermostat.selected == sensor.id){
+                checkbox.checked = true;
+            }
+
+            div.appendChild(checkbox);
+            div.appendChild(label);
+
+            aps.appendChild(div);
+
+        }
+
+
+
+        var current_key = 0;
+        for (var z in schedule[today]) {
+            if (schedule[today][z].s <= timenow && schedule[today][z].e > timenow) {
+                if (thermostat.mode == 1) {
+                    setpoint = schedule[today][z].sp * 1;
+                    $(".zone-setpoint").html(setpoint.toFixed(1) + unit);
+                    current_key = z;
+                }
+            }
+
+        }
+
+
+
+        var sx = $(".slider[day=" + today + "]")[0].offsetLeft;
+        var y = $(".slider[day=" + today + "]")[0].offsetTop;
+        var x1 = sx + slider_width * (timenow / 24.0);
+        var x2 = sx + slider_width * (schedule[today][current_key].s / 24.0);
+
+        x2 = sx;
+        $("#timemarker").css('top', y + "px");
+        $("#timemarker").css('left', x2 + "px");
+        $("#timemarker").css('width', (x1 - x2) + "px");
     }
-
-    if (thermostat.state === 1) {
-        $("#toggle").html("ON");
-        $("#toggle").css("background-color", "#ff9600");
-    } else {
-        $("#toggle").html("OFF");
-        $("#toggle").css("background-color", "#555");
-    }
-
-    if (thermostat.mode === 0) {
-        $(".thermostatmode").css("background-color", "#555");
-        $("#manual_thermostat").css("background-color", "#ff9600");
-        $("#scheduled_thermostat").css("background-color", "#555");
-    } else {
-        $(".thermostatmode").css("background-color", "#555");
-        $("#manual_thermostat").css("background-color", "#555");
-        $("#scheduled_thermostat").css("background-color", "#ff9600");
-    }
-
-    if (thermostat.opmode == 0) {
-        $(".thermostatopmode").css("background-color", "#555");
-        $("#heating_thermostat").css("background-color", "#c00000");
-        $("#cooling_thermostat").css("background-color", "#555");
-    } else {
-        $(".thermostatopmode").css("background-color", "#555");
-        $("#heating_thermostat").css("background-color", "#555");
-        $("#cooling_thermostat").css("background-color", "#0000c0");
-    }
-
 }
 
 $("#toggle").click(function () {
@@ -234,8 +347,8 @@ $("#zone-setpoint-dec").click(function () {
     $(".zone-setpoint").html(setpoint.toFixed(1) + unit);
 
     //save("tx/heating",thermostat.state+","+parseInt(setpoint*100));
-    save("thermostat_mode", thermostat.mode.toString());
-    save("thermostat_manualsetpoint", ((thermostat.manualsetpoint.toFixed(1)) * 100).toString());
+    save("thermostat_mode", thermostat.mode);
+    save("thermostat_manualsetpoint", ((thermostat.manualsetpoint.toFixed(1)) * 100));
 });
 
 $("#zone-setpoint-inc").click(function () {
@@ -247,8 +360,8 @@ $("#zone-setpoint-inc").click(function () {
     $(".zone-setpoint").html(setpoint.toFixed(1) + unit);
 
     //save("tx/heating",thermostat.state+","+parseInt(setpoint*100));
-    save("thermostat_mode", (thermostat.mode).toString());
-    save("thermostat_manualsetpoint", ((thermostat.manualsetpoint.toFixed(1)) * 100).toString());
+    save("thermostat_mode", thermostat.mode);
+    save("thermostat_manualsetpoint", ((thermostat.manualsetpoint.toFixed(1)) * 100));
 });
 
 // ============================================
@@ -461,7 +574,7 @@ $("#manual_thermostat").click(function () {
     setpoint = thermostat.manualsetpoint;
     $(".zone-setpoint").html(setpoint.toFixed(1) + unit);
 
-    save("thermostat_mode", (thermostat.mode).toString());
+    save("thermostat_mode", thermostat.mode);
     updateclock();
 });
 
@@ -469,6 +582,15 @@ $("#scheduled_thermostat").click(function () {
     $(".thermostatmode").css("background-color", "#555");
     $(this).css("background-color", "#ff9600");
     thermostat.mode = 1;
+    save("thermostat_mode", (thermostat.mode).toString());
+    updateclock();
+});
+
+$("#scheduled_auto").click(function () {
+    console.log("mode auto")
+    $(".thermostatmode").css("background-color", "#555");
+    $(this).css("background-color", "#ff9600");
+    thermostat.mode = 2;
     save("thermostat_mode", (thermostat.mode).toString());
     updateclock();
 });
@@ -589,17 +711,31 @@ function checkVisibility() {
     });
 }
 
-function save(param, payload) {
-    console.log("Saving "+param+" "+payload)
-    doingsave=true;
+function setHysteresis() {
+    console.log("Setting Hystersis");
 
     var cmd = new Object();
-    cmd.cmd = param;
-    if(param == "thermostat_state"){
+    cmd.event = "set_hysteresis";
+    cmd["hysteresis_h"] = parseInt(document.getElementById('thermostat1hysteresishigh').value);
+    cmd["hysteresis_l"] = parseInt(document.getElementById('thermostat1hysteresislow').value);
+
+    var json = JSON.stringify(cmd);
+    connection.send(json);
+    console.log(cmd);
+
+
+}
+function save(param, payload) {
+    console.log("Saving " + param + " " + payload)
+    doingsave = true;
+
+    var cmd = new Object();
+    cmd.event = param;
+    if (param == "thermostat_state") {
         cmd.state = payload;
-    }else if(param =="thermostat_manualsetpoint"){
+    } else if (param == "thermostat_manualsetpoint") {
         cmd.temperature = payload;
-    }else if(param =="thermostat_schedule"){
+    } else if (param == "thermostat_schedule") {
         // TODO:
         var strtointdays = {
             'mon': 0,
@@ -611,48 +747,19 @@ function save(param, payload) {
             'sun': 6
         };
 
-        cmd["day"]= strtointdays[day];
+        cmd["day"] = strtointdays[day];
         cmd["schedule"] = calc_schedule_esp(schedule[day]);
-    }else if(param == "thermostat_mode"){
+    } else if (param == "thermostat_mode") {
 
-        cmd.mode = payload;
+        cmd.mode = parseInt(payload);
     }
 
     var json = JSON.stringify(cmd);
     console.log(json);
 
     connection.send(json);
+    update();
 
-    // $.ajax({
-    //     type: 'POST',
-    //     url: "thermostat.cgi?param=" + param,
-    //     data: payload,
-    // 	dataType: 'text',
-    // 	cache: false,
-    //     async: true,
-    // 		timeout: 3000,
-    // 		tryCount : 0,
-    // 		retryLimit : 3,			success: function (data) {
-    // 		statusMsg = false;
-    // 		if(!connected) setStatus("Connected",2,0);
-    // 		connected=true;
-    // 		doingsave=false;
-    // 	},
-    // 	error : function(xhr, textStatus, errorThrown ) {
-    //     if (textStatus == 'timeout') {
-    //         this.tryCount++;
-    //         if (this.tryCount <= this.retryLimit) {
-    //             //try again
-    //             $.ajax(this);
-    //             return;
-    //         }
-    //         return;
-    //     }
-    // 	if(connected) setStatus("No connection to server!",0,1);
-    // 	connected=false;
-    // 	doingsave=false;
-    // 	}
-    // });
 }
 
 

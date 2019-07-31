@@ -23,9 +23,6 @@ void Relay::turnOff() {
     {
         digitalWrite(RELAY_PIN,LOW);
         relayState= false;
-    }else
-    {
-        Serial.println("Already turned OFF");
     }
 }
 
@@ -33,9 +30,5 @@ void Relay::turnOn() {
     if(relayState == false){
         digitalWrite(RELAY_PIN,HIGH);
         relayState= true;
-    }else
-    {
-        Serial.println("Already turned ON");
     }
-
 }

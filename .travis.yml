@@ -1,0 +1,33 @@
+language: python
+python:
+- '2.7'
+sudo: false
+cache:
+  directories:
+  - "~/.platformio"
+install:
+- pip install -U platformio
+- platformio platform install espressif8266 --with-package tool-mkspiffs
+script:
+- platformio --version
+- platformio run -e thermostat_deploy
+- platformio run -t buildfs -e thermostat_deploy
+deploy:
+  provider: releases
+  skip_cleanup: true
+  overwrite: true
+  api_key:
+    secure: XpRz6ZghDdi_ygTJYM_gzQ
+  file:
+  - ".pioenvs/esp_deploy/firmware.bin"
+  - ".pioenvs/esp_deploy/spiffs.bin"
+  on:
+    repo: Jean-Emile/ESP8266_Thermostat
+    all_branches: true
+    condition: $TRAVIS_TAG =~ ^[0-9]+\.[0-9]+\.[0-9]+$
+
+## Setup auto depoly .hex on release tag
+# sudo gem install travis
+# cd into repo
+# $ travis setup releases
+# folow prompts..depoly section will be populated

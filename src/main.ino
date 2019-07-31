@@ -27,21 +27,23 @@
 #include "WebServerHandler.h"
 #include "OtaHandler.h"
 #include "SpiffsHandler.h"
-#include "Sensors.h"
+#include "Gsender.h"
 
+WifiHandler wifiHandler;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 Sensors sensors(timeClient);
-SpiffsHandler spiffsHandler;
-WifiHandler wifiHandler;
 Relay relay;
 Thermostat thermostat(timeClient,sensors,relay);
-RF69Handler rf69Handler(sensors);
+
+SpiffsHandler spiffsHandler;
+
+//NOTE: consider using singletons
 WebSocketHandler webSocketHandler(sensors,spiffsHandler,thermostat,relay);
 MqttHandler mqttHandler(sensors,wifiHandler,thermostat);
+RF69Handler rf69Handler(sensors, mqttHandler);
 WebServerHandler webServerHandler;
 OtaHandler otaHandler;
-
 
 void ledblink(int times, int lengthms, int pinnum) {
     for (int x = 0; x < times; x++) {
@@ -67,9 +69,9 @@ void setup(void){
     spiffsHandler.setup();
     timeClient.begin();
 
-
     spiffsHandler.loadConfiguration();
     thermostat.loadConfiguration();
+
     timeClient.setTimeOffset(spiffsHandler.tz); /// GMT +1 = 3600; GMT+2 7200, ..
 
     wifiHandler.setup(spiffsHandler.ssid,spiffsHandler.wifiPassword);
@@ -83,7 +85,18 @@ void setup(void){
                       spiffsHandler.mqttPassword,
                       spiffsHandler.mqttPort);
     webSocketHandler.setup();
+
+    Gsender *gsender = Gsender::Instance();
+
+    gsender->setup(spiffsHandler.mailServer,
+                   spiffsHandler.mailUser,
+                   spiffsHandler.mailPassword,
+                   spiffsHandler.mailfrom,
+                   spiffsHandler.mailto,
+                   spiffsHandler.mailPort);
+
 }
+
 
 
 void loop(void) {

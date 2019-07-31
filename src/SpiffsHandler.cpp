@@ -20,13 +20,13 @@ SpiffsHandler::~SpiffsHandler() {
 bool SpiffsHandler::loadConfiguration() {
     File configFile = SPIFFS.open("/config.json", "r");
     if (!configFile) {
-        Serial.println("Failed to open config file");
+        Serial.println("[CRITICAL] Failed to open config file");
         return false;
     }
 
     size_t size = configFile.size();
-    if (size > 300) {
-        Serial.println("Config file size is too large");
+    if (size > 450) {
+        Serial.println("[CRITICAL] Config file size is too large");
         return false;
     }
     Serial.println(size);
@@ -39,18 +39,28 @@ bool SpiffsHandler::loadConfiguration() {
     JsonObject& config = jsonBuffer.parseObject(buf.get());
 
     if (!config.success()) {
-        Serial.println("Failed to parse config file");
+        Serial.println("[WARNING] Failed to parse config file");
         return false;
     }
 
     strcpy(this->ssid,config["wifi"]["ssid"]);
     strcpy(this->wifiPassword,config["wifi"]["password"]);
 
+    // MQTT
     strcpy(this->mqttServer,config["mqtt"]["server"]);
     strcpy(this->mqttUser,config["mqtt"]["user"]);
     strcpy(this->mqttPassword,config["mqtt"]["password"]);
-    this->mqttPort = config["mqtt"]["port"];;
-    this->tz = config["ntp"]["tz"];;
+    this->mqttPort = config["mqtt"]["port"];
+
+    this->tz = config["ntp"]["tz"];
+    // SMTP
+    strcpy(this->mailServer,config["mail"]["server"]);
+    strcpy(this->mailUser,config["mail"]["login"]);
+    strcpy(this->mailPassword,config["mail"]["password"]);
+    strcpy(this->mailfrom,config["mail"]["from"]);
+    strcpy(this->mailfrom,config["mail"]["to"]);
+    this->mailPort = config["mail"]["port"];
+
 
 
     return true;
@@ -62,7 +72,7 @@ bool SpiffsHandler::saveConfiguration() {
     json["ssid"] = "";
     json["wpwd"] = "";
 
-
+    // TODO
     File configFile = SPIFFS.open("/config.json", "w");
     if (!configFile) {
         Serial.println("Failed to open config file for writing");
@@ -81,6 +91,7 @@ String SpiffsHandler::formatBytes(size_t bytes) { // convert sizes in bytes to K
     } else if (bytes < (1024 * 1024 * 1024)) {
         return String(bytes / 1024.0 / 1024.0) + "MB";
     }
+    return  String(bytes);
 }
 
 

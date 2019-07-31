@@ -10,6 +10,7 @@
 #include <NTPClient.h> // get it here https://github.com/arduino-libraries/NTPClient
 #include <FS.h>   // Include the SPIFFS library
 #include <ArduinoJson.h>
+#include <Time.h> // get it here https://github.com/PaulStoffregen/Time/tree/v1.5
 
 #include "Relay.h"
 #include "Sensors.h"
@@ -26,10 +27,15 @@ enum ThermostatState {
     THERMOSTAT_ON=1
 } ;
 
+enum ThermostatSave {
+    SCHEDULE_CONFIG=0,
+    THERMOSTAT_CONFIG=1
+} ;
+
 typedef struct {
-    uint16_t start;
-    uint16_t end;
-    uint16_t setpoint;  // Degrees C in * 100 i.e. 2350=23.5*C
+    uint32_t start;
+    uint32_t end;
+    uint32_t setpoint;  // Degrees C in * 100 i.e. 2350=23.5*C
     uint16_t active; 	 // pad to 4 byte boundary
 } dayScheduleElement;
 
@@ -49,31 +55,41 @@ public:
     ~Thermostat();
 
     void update();
-    void setManualTemperature(int temp);
-    int getThermostatMode();
-    int getThermostatState();
-    int getThermostatManuelSetPoint();
+
+    void setHysteresisLow(int temp);
+    void setHysteresisHigh(int temp);
+    void setManualSetPoint(int temp);
+
+    int getSelectedSensor();
+    void setSelectedSensor(int id);
+
+    int getMode();
+    int getState();
+    int getManuelSetPoint();
+    int getHysteresisLow();
+    int getHysteresisHigh();
+
     void turnOn();
     void turnOff();
     void setMode(int mode);
     bool loadConfiguration();
-    bool saveConfiguration();
-
+    bool saveConfiguration(int target);
+    NTPClient *ntpClient;
     WeekSchedule thermostatSchedule;
 private:
     void handle(int current_t, int setpoint);
 
-    NTPClient *ntpClient;
+
     Relay *relay;
     Sensors *sensors;
     int thermostatMode;
     int thermostatState;
+    int selectedSensor;
 
     int thermostatManualsetpoint;
     int thermostatHysteresisLow;
     int thermostatHysteresisHigh;
-    double lastUpdate;
-    int temperatures[10];
+    unsigned long lastUpdate;
 
 };
 

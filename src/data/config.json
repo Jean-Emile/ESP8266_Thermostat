@@ -8,9 +8,17 @@
     "server":"",
     "user":"",
     "password": "",
-    "port":1883
+    "port":8883
   },
   "ntp":{
     "tz":7200
+  },
+  "mail":{
+    "server": "smtp.gmail.com",
+    "login":"",
+    "password": "",
+    "from": "",
+    "to": "",
+    "port":465
   }
 }
