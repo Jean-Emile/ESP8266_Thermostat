@@ -45,8 +45,8 @@ $ pio run
 
 `$ pio run -t uploadfs`
 
-### Configuration
-The thermostat configuration is available is the folder "src/data/config.json"
+## Configuration
+The thermostat configuration is available in the folder "src/data/config.json"
 
 #### Config.json:
 ```json
@@ -93,24 +93,6 @@ Go to your Google account settings (https://myaccount.google.com/security#activi
 
 base64encode.org for encoding your login and password  
 
-### Compile the Firmware
-
-####Requirements: 
-
-First, you have to install and configure Arduino ESP8266 Core by following:
-https://github.com/esp8266/Arduino/blob/2.4.2/doc/installing.rst
-
-```console
-git clone https://github.com/Jean-Emile/ESP8266_Thermostat.git
-cd ESP8266_Thermostat
-make
-make flash
-make flash_fs
-```
-
-
-
 # References
-
 [1] https://guide.openenergymonitor.org/integrations/mqtt-relay/
 
