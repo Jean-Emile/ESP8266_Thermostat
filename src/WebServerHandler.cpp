@@ -87,6 +87,8 @@ void WebServerHandler::handleFileUpload(){ // upload a new file to the SPIFFS
 
 void WebServerHandler::setup() { // Start a HTTP server with a file read handler and an upload handler
 
+    Serial.println("[INFO] WebServer setup()");
+
     this->server->on("/ota.html",  HTTP_POST, [&]() {  // If a POST request is sent to the /ota.html address,
          server->send(200, "text/plain", "");
     }, std::bind(&WebServerHandler::handleFileUpload, this));                       // go to 'handleFileUpload'
@@ -96,7 +98,7 @@ void WebServerHandler::setup() { // Start a HTTP server with a file read handler
     server->onNotFound(std::bind(&WebServerHandler::handleNotFound, this));
 
     this->server->begin();                             // start the HTTP server
-    Serial.println("HTTP server started.");
+    Serial.println("[INFO] HTTP server started.");
 }
 
 void WebServerHandler::update() {

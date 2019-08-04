@@ -15,6 +15,8 @@
 #include "Relay.h"
 #include "Sensors.h"
 
+#define MAXIMUM_SCHEDULE_PER_DAY 8
+
 enum ThermostatMode
 {
     THERMOSTAT_MANUAL=0,
@@ -40,7 +42,7 @@ typedef struct {
 } dayScheduleElement;
 
 typedef struct {
-    dayScheduleElement daySched[8]; // Max 8 schedules per day
+    dayScheduleElement daySched[MAXIMUM_SCHEDULE_PER_DAY]; // Max 8 schedules per day
 }  daySchedule;
 
 typedef struct {

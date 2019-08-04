@@ -14,6 +14,7 @@ OtaHandler::~OtaHandler() {
 
 
 void OtaHandler::setup() {
+    Serial.println("[INFO] OtaHandler setup()");
 
     const char *OTAName = "ESP8266";           // A name and a password for the OTA service
     const char *OTAPassword = "esp8266";
@@ -39,7 +40,7 @@ void OtaHandler::setup() {
         else if (error == OTA_END_ERROR) Serial.println("End Failed");
     });
     ArduinoOTA.begin();
-    Serial.println("OTA ready\r\n");
+    Serial.println("[INFO] OTA ready\r\n");
 }
 
 void OtaHandler::update() {

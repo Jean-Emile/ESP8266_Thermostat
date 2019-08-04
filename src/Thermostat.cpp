@@ -181,8 +181,14 @@ bool Thermostat::loadConfiguration(){
     std::unique_ptr<char[]> bufConfig(new char[size]);
     configThermo.readBytes(bufConfig.get(), size);
 
-    DynamicJsonBuffer jsonBufferConfig;
-    JsonObject& config = jsonBufferConfig.parseObject(bufConfig.get());
+    DynamicJsonDocument config(1024);
+    DeserializationError error = deserializeJson(config, bufConfig.get());
+    if (error){
+        Serial.print(F("deserializeJson() failed with code "));
+        Serial.println(error.c_str());
+        return   false;
+    }
+
     int mode = config["mode"];
     int manualsetpoint = config["manualsetpoint"];
     int state = config["state"];
@@ -209,40 +215,40 @@ bool Thermostat::loadConfiguration(){
         this->relay->turnOff();
     }
 
-    File configFile = SPIFFS.open("/schedule.json", "r");
-    if (!configFile) {
+    File scheduleFile = SPIFFS.open("/schedule.json", "r");
+    if (!scheduleFile) {
         Serial.println("Failed to open config file");
         return false;
     }
 
-    size = configFile.size();
-    if (size > 1800) {
+    size = scheduleFile.size();
+    if (size > 4096) {
         Serial.printf("Schedule Config file size is too large %f\n ", size);
         return false;
     }
 
-
     // Allocate a buffer to store contents of the file.
     std::unique_ptr<char[]> buf(new char[size]);
 
-    configFile.readBytes(buf.get(), size);
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject& scheduleJson = jsonBuffer.parseObject(buf.get());
+    scheduleFile.readBytes(buf.get(), size);
 
-    if (!scheduleJson.success()) {
-        Serial.println("Failed to parse config file");
+    DynamicJsonDocument scheduleJson(4096);
+
+    DeserializationError error_schedule = deserializeJson(scheduleJson, buf.get());
+    if (error_schedule) {
+        Serial.println("[CRITICAL] Failed to parse schedule file with code");
+        Serial.println(error.c_str());
         return false;
     }
 
     for(int dow=0; dow<7; dow++) {
-        JsonArray& schedule = scheduleJson[String(dow)].asArray();
+        JsonArray schedule = scheduleJson[String(dow)];
+
         int i=0;
-        for (auto& row : schedule) {
-            // TODO: check type
+        for (auto row : schedule) {
             int start = row["s"];
             int end = row["e"];
             int sp = row["sp"];
-
             if(i < 8){
                 thermostatSchedule.weekSched[dow].daySched[i].start=start; //0am
                 thermostatSchedule.weekSched[dow].daySched[i].end=end; //6am, hours are * 100
@@ -261,27 +267,25 @@ bool Thermostat::saveConfiguration(int target){
 
     if(target == SCHEDULE_CONFIG){
 
-        DynamicJsonBuffer jsonBufferThermostatSchedule;
-        JsonObject& jsonThermostatSchedule = jsonBufferThermostatSchedule.createObject();
+        DynamicJsonDocument jsonThermostatSchedule(4096);
 
         for(int dow=0; dow<7; dow++) {
-            JsonArray& jsonDow = jsonThermostatSchedule.createNestedArray(String(dow));
+            JsonArray jsonDow = jsonThermostatSchedule.createNestedArray(String(dow));
 
-            for(int sched=0; sched<8 && thermostatSchedule.weekSched[dow].daySched[sched].active==1; sched++) {
-                JsonObject& zone = jsonDow.createNestedObject();
+            for(int sched=0; sched<MAXIMUM_SCHEDULE_PER_DAY && thermostatSchedule.weekSched[dow].daySched[sched].active==1; sched++) {
+                JsonObject zone = jsonDow.createNestedObject();
                 zone["s"] = thermostatSchedule.weekSched[dow].daySched[sched].start;
                 zone["e"] = thermostatSchedule.weekSched[dow].daySched[sched].end;
                 zone["sp"] = thermostatSchedule.weekSched[dow].daySched[sched].setpoint;
             }
         }
         File scheduleFile = SPIFFS.open("/schedule.json", "w");
-        jsonThermostatSchedule.printTo(scheduleFile);
+        serializeJson(jsonThermostatSchedule, scheduleFile);
         scheduleFile.close();
         return true;
     }else if(target == THERMOSTAT_CONFIG) {
 
-        StaticJsonBuffer<500> jsonBuffer;
-        JsonObject &thermoConfig = jsonBuffer.createObject();
+        StaticJsonDocument<500> thermoConfig;
 
         thermoConfig["state"] = getState();
         thermoConfig["manualsetpoint"] = getManuelSetPoint();
@@ -291,7 +295,7 @@ bool Thermostat::saveConfiguration(int target){
         thermoConfig["selectedSensor"] = getSelectedSensor();
 
         File thermostatFile = SPIFFS.open("/thermostat.json", "w");
-        thermoConfig.printTo(thermostatFile);
+        serializeJson(thermoConfig, thermostatFile);
         thermostatFile.close();
         return true;
 

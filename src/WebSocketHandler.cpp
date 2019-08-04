@@ -19,6 +19,7 @@ WebSocketHandler::~WebSocketHandler() {
 }
 
 void WebSocketHandler::setup() {
+    Serial.println("[INFO] WebSocketHandler setup()");
     // TODO load/save config
     //  webSocket->setAuthorization("esp8266", "Led*ZInqsdf9");
     webSocket->begin();                          // start the websocket server
@@ -28,7 +29,7 @@ void WebSocketHandler::setup() {
                                  std::placeholders::_3,
                                  std::placeholders::_4));          // if there's an incomming websocket message, go to function 'webSocketEvent'
 
-    Serial.println("WebSocket server started.");
+    Serial.println("[INF0] WebSocket server started.");
 }
 
 
@@ -46,44 +47,21 @@ void WebSocketHandler::onWsEvent(uint8_t num, WStype_t type, uint8_t * payload, 
             break;
         case WStype_CONNECTED: {              // if a new websocket connection is established
             IPAddress ip = webSocket->remoteIP(num);
-
-            // thermostat_schedule
-            DynamicJsonBuffer jsonBufferThermostatSchedule;
-            JsonObject& jsonThermostatSchedule = jsonBufferThermostatSchedule.createObject();
-            jsonThermostatSchedule["event"] = "thermostat_schedule";
-
-            for(int dow=0; dow<7; dow++) {
-                // TODO: remove this array
-                const char * days[7] = {"mon","tue","wed","thu","fri","sat","sun"};
-
-                JsonArray& jsonDow = jsonThermostatSchedule.createNestedArray(days[dow]);
-
-                for(int sched=0; sched<8 && thermostat->thermostatSchedule.weekSched[dow].daySched[sched].active==1; sched++) {
-                    JsonObject& zone = jsonDow.createNestedObject();
-                    zone["s"] = thermostat->thermostatSchedule.weekSched[dow].daySched[sched].start;
-                    zone["e"] = thermostat->thermostatSchedule.weekSched[dow].daySched[sched].end;
-                    zone["sp"] = thermostat->thermostatSchedule.weekSched[dow].daySched[sched].setpoint;
-                }
-            }
-            String output2;
-            jsonThermostatSchedule.printTo(output2);
-            webSocket->sendTXT(num, output2);
-
-
         }
             break;
         case WStype_TEXT:                     // if new text data is received
             // Serial.printf("[%u] get Text: %s\n", num, payload);
 
-            DynamicJsonBuffer jsonBuffer;
-            JsonObject& root = jsonBuffer.parseObject(&payload[0]);
+            DynamicJsonDocument root(1024);
 
-            if (!root.success()) {
+            auto error = deserializeJson(root, &payload[0]);
+
+            if (error) {
                 Serial.println("parseObject() failed");
 
             }else
             {
-                String target = root["event"].asString();
+                String target = root["event"];
 
                 if (target.equals("relay")) {
 
@@ -102,33 +80,31 @@ void WebSocketHandler::onWsEvent(uint8_t num, WStype_t type, uint8_t * payload, 
                 }else if(target.equals("restart")) {
                     ESP.restart();
                 }else if(target.equals("freeheap")){
-                    DynamicJsonBuffer jsonBuffer;
-                    JsonObject& freeHeap = jsonBuffer.createObject();
+                    DynamicJsonDocument freeHeap(1024);
+
                     freeHeap["event"] = "freeheap";
                     root["freeheap"] =  ESP.getFreeHeap();
                     String retJson;
-                    root.printTo(retJson);
+                    serializeJson(root, retJson);
                     webSocket->sendTXT(num, retJson);
                 }else if(target.equals("time")){
-                    DynamicJsonBuffer jsonBuffer;
-                    JsonObject& freeHeap = jsonBuffer.createObject();
+                    DynamicJsonDocument freeHeap(1024);
+
                     freeHeap["event"] = "time";
                     root["currtime"] =  this->thermostat->ntpClient->getFormattedTime();
                     String retJson;
-                    root.printTo(retJson);
+                    serializeJson(root, retJson);
                     webSocket->sendTXT(num, retJson);
                 }else if(target.equals("do_wifi_scan")){
 
                     Serial.println("do_wifi_scan");
-
-                    DynamicJsonBuffer jsonBuffer;
-                    JsonObject& root = jsonBuffer.createObject();
+                    DynamicJsonDocument root(1024);
                     root["event"] = "wifi_scan";
                     byte n = WiFi.scanNetworks();
-                    JsonArray& networks = root.createNestedArray("networks");
+                    JsonArray networks = root.createNestedArray("networks");
 
                     for(int i=0;i<n;i++) {
-                        JsonObject& network = networks.createNestedObject();
+                        JsonObject network = networks.createNestedObject();
                         network["ssid"] = WiFi.SSID(i);
                         network["encryption"] = WiFi.encryptionType(i);
                         network["rssi"] = WiFi.RSSI(i);
@@ -138,7 +114,7 @@ void WebSocketHandler::onWsEvent(uint8_t num, WStype_t type, uint8_t * payload, 
                     }
 
                     String retJson;
-                    root.printTo(retJson);
+                    serializeJson(root, retJson);
                     webSocket->sendTXT(num, retJson);
                 } else if(target.equals("thermostat_state")){
 
@@ -165,41 +141,59 @@ void WebSocketHandler::onWsEvent(uint8_t num, WStype_t type, uint8_t * payload, 
 
                 }else if(target.equals("thermostat_schedule")){
 
-                    if (root.containsKey("day") && root.containsKey("schedule" ) && root.is<int>("day")) {
+                    if (root.containsKey("day") && root.containsKey("schedule" ) && root["day"].is<int>()) {
                         int dow = root["day"];
-
                         if(dow >=0 && dow <=7){
 
-                            JsonArray& scheduleRoot = root["schedule"].asArray();
-                            int i=0;
-                            for (auto& row : scheduleRoot) {
+                            JsonArray scheduleRoot = root["schedule"];
 
-//                                if(root.containsKey("s") && root["s"].is<int>() &&
-//                                   root.containsKey("e") && root["e"].is<int>() &&
-//                                   root.containsKey("sp") && root["sp"].is<int>()) {
+                            if(scheduleRoot.size() < MAXIMUM_SCHEDULE_PER_DAY){
 
-                                    int start = row["s"];
-                                    int end = row["e"];
-                                    int sp = row["sp"];
+                                int i=0;
+                                for (auto row : scheduleRoot) {
 
-                                    if(i < 8){
-                                        thermostat->thermostatSchedule.weekSched[dow].daySched[i].start=start; //0am
-                                        thermostat->thermostatSchedule.weekSched[dow].daySched[i].end=end; //6am, hours are * 100
-                                        thermostat->thermostatSchedule.weekSched[dow].daySched[i].setpoint=sp; //10.0*C
-                                        thermostat->thermostatSchedule.weekSched[dow].daySched[i].active=1;
-                                        i++;
+                                    if(row.containsKey("s") && row.containsKey("e") &&  row.containsKey("sp")) {
+
+                                        if(row["s"].is<int>()  && row["e"].is<int>() && row["sp"].is<int>())
+                                        {
+
+                                            int start = row["s"];
+                                            int end = row["e"];
+                                            int sp = row["sp"];
+
+                                            if(i < MAXIMUM_SCHEDULE_PER_DAY){
+
+                                                thermostat->thermostatSchedule.weekSched[dow].daySched[i].start=start; //0am
+                                                thermostat->thermostatSchedule.weekSched[dow].daySched[i].end=end; //6am, hours are * 100
+                                                thermostat->thermostatSchedule.weekSched[dow].daySched[i].setpoint=sp; //10.0*C
+                                                thermostat->thermostatSchedule.weekSched[dow].daySched[i].active=1;
+                                                i++;
+                                            }
+
+                                        }else {
+
+                                            Serial.println("[WARNING] start/end/setpoint have to be integer");
+
+                                        }
+
+                                    }else {
+                                        Serial.println("[WARNING] start/end/setpoint are mandatory");
+
                                     }
 
-                                //}
 
+                                }
+                                if(i < MAXIMUM_SCHEDULE_PER_DAY){
+                                    thermostat->thermostatSchedule.weekSched[dow].daySched[i].active=0;	//mark the next schedule as inactive
+                                }
+
+                                thermostat->saveConfiguration(SCHEDULE_CONFIG);
 
 
                             }
-                            if(i <8){
-                                thermostat->thermostatSchedule.weekSched[dow].daySched[i].active=0;	//mark the next schedule as inactive
-                            }
+
                         }
-                        thermostat->saveConfiguration(SCHEDULE_CONFIG);
+
 
                     }
 
@@ -213,15 +207,14 @@ void WebSocketHandler::onWsEvent(uint8_t num, WStype_t type, uint8_t * payload, 
 
                 }else if(target.equals("get_thermostat_states")){
 
-                    DynamicJsonBuffer jsonBuffer; // https://arduinojson.org/v5/assistant/
-                    JsonObject& root = jsonBuffer.createObject();
+                    DynamicJsonDocument root(1024); // https://arduinojson.org/v5/assistant/
                     root["event"] = "thermostat_states";
 
-                    JsonArray& jsonSensors = root.createNestedArray("sensors");
+                    JsonArray jsonSensors = root.createNestedArray("sensors");
 
                     for(int i=0; i< MAX_SENSORS;i++){
                         if(sensors->readSensor(i).active == true){
-                            JsonObject& sensor = jsonSensors.createNestedObject();
+                            JsonObject sensor = jsonSensors.createNestedObject();
                             sensor["id"] = i;
                             sensor["temp"] = sensors->readSensor(i).temperature;
                             sensor["hum"] = sensors->readSensor(i).humidity;
@@ -242,7 +235,7 @@ void WebSocketHandler::onWsEvent(uint8_t num, WStype_t type, uint8_t * payload, 
                     root["hysteresis_l"] = thermostat->getHysteresisLow();
 
                     String output;
-                    root.printTo(output);
+                    serializeJson(root, output);
 
                     webSocket->sendTXT(num, output);
                 } else if(target.equals("thermostat_selected")) {
@@ -251,31 +244,47 @@ void WebSocketHandler::onWsEvent(uint8_t num, WStype_t type, uint8_t * payload, 
                     {
                         int sensorID = root["sensorid"];
                         thermostat->setSelectedSensor(sensorID);
-
                         thermostat->saveConfiguration(THERMOSTAT_CONFIG);
                     }
 
                 } else if(target.equals("set_hysteresis")) {
 
-
-                    Serial.print(target);
                     if(root.containsKey("hysteresis_h") && root.containsKey("hysteresis_l")){
-
                         if(root["hysteresis_h"].is<int>() && root["hysteresis_l"].is<int>() )
                         {
-
                             int hysteresis_h = root["hysteresis_h"];
                             int hysteresis_l = root["hysteresis_l"];
 
                             thermostat->setHysteresisHigh(hysteresis_h);
                             thermostat->setHysteresisLow(hysteresis_l);
+                            thermostat->saveConfiguration(THERMOSTAT_CONFIG);
                         }
 
 
-                        thermostat->saveConfiguration(THERMOSTAT_CONFIG);
                     }
 
 
+                } else if(target.equals("get_schedule")) {
+                    // thermostat_schedule
+                    DynamicJsonDocument jsonThermostatSchedule(4096);
+                    jsonThermostatSchedule["event"] = "thermostat_schedule";
+
+                    for(int dow=0; dow<7; dow++) {
+                        // TODO: remove this array
+                        const char * days[7] = {"mon","tue","wed","thu","fri","sat","sun"};
+
+                        JsonArray jsonDow = jsonThermostatSchedule.createNestedArray(days[dow]);
+
+                        for(int sched=0; sched<8 && thermostat->thermostatSchedule.weekSched[dow].daySched[sched].active==1; sched++) {
+                            JsonObject zone = jsonDow.createNestedObject();
+                            zone["s"] = thermostat->thermostatSchedule.weekSched[dow].daySched[sched].start;
+                            zone["e"] = thermostat->thermostatSchedule.weekSched[dow].daySched[sched].end;
+                            zone["sp"] = thermostat->thermostatSchedule.weekSched[dow].daySched[sched].setpoint;
+                        }
+                    }
+                    String output2;
+                    serializeJson(jsonThermostatSchedule,output2);
+                    webSocket->sendTXT(num, output2);
 
                 }
 

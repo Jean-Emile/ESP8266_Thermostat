@@ -35,10 +35,11 @@ bool SpiffsHandler::loadConfiguration() {
     std::unique_ptr<char[]> buf(new char[size]);
 
     configFile.readBytes(buf.get(), size);
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject& config = jsonBuffer.parseObject(buf.get());
+    DynamicJsonDocument config(1024);
+    DeserializationError error = deserializeJson(config, buf.get());
 
-    if (!config.success()) {
+
+    if (error) {
         Serial.println("[WARNING] Failed to parse config file");
         return false;
     }
@@ -67,8 +68,7 @@ bool SpiffsHandler::loadConfiguration() {
 }
 
 bool SpiffsHandler::saveConfiguration() {
-    StaticJsonBuffer<200> jsonBuffer;
-    JsonObject& json = jsonBuffer.createObject();
+    StaticJsonDocument<200> json;
     json["ssid"] = "";
     json["wpwd"] = "";
 
@@ -79,7 +79,7 @@ bool SpiffsHandler::saveConfiguration() {
         return false;
     }
 
-    json.printTo(configFile);
+    serializeJson(json, configFile);
     return true;
 }
 
@@ -96,7 +96,9 @@ String SpiffsHandler::formatBytes(size_t bytes) { // convert sizes in bytes to K
 
 
 void SpiffsHandler::setup() {
+
     SPIFFS.begin();                             // Start the SPI Flash File System (SPIFFS)
+    Serial.println("[INFO] WebSocketHandler setup()");
     Serial.println("SPIFFS started. Contents:");
     {
         Dir dir = SPIFFS.openDir("/");

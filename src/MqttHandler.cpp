@@ -105,7 +105,7 @@ void MqttHandler::callback(char* topic, byte* payload, unsigned int length) {
     if (sscanf(topic, "emon/emonth%d/%s", &nodeId, sensorId) == 2) {
         //NOTE: If no valid conversion could be performed because the String doesn’t start with a digit, a zero is returned. Data type: float.
 
-        Serial.printf("nodeID %d (%s) %d \r\n", nodeId, sensorId);
+        Serial.printf("nodeID %d (%s) %s \r\n", nodeId, sensorId, message_buff);
 
         if (strcmp(sensorId, "temperature") == 0) {
             sensors->updateValue(nodeId, SENSOR_TYPE_TEMPERATURE, (int) (data.toFloat() * 100));

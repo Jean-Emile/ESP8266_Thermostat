@@ -19,14 +19,13 @@ RF69Handler::~RF69Handler() {
 }
 
 void RF69Handler::setup() {
-
+    Serial.println("[INFO] RF69Handler setup()");
     // Hard Reset the RFM module
     pinMode(RFM69_RST, OUTPUT);
     digitalWrite(RFM69_RST, HIGH);
     delay(100);
     digitalWrite(RFM69_RST, LOW);
     delay(100);
-
     // Initialize radio
     if (!radio->initialize(FREQUENCY,NODEID,NETWORKID)) {
         Serial.println("radio.initialize failed!");
@@ -37,7 +36,7 @@ void RF69Handler::setup() {
 
     radio->encrypt(ENCRYPTKEY);
     radio->promiscuous(false);
-    radio->setPowerLevel(10);
+    //radio->setPowerLevel(10);
 
     pinMode(LED, OUTPUT);
     Serial.print("\nFreq at ");
@@ -109,9 +108,9 @@ void RF69Handler::update() {
 
         if (radio->ACKRequested())
         {
-           // byte theNodeID = radio->SENDERID;
+            // byte theNodeID = radio->SENDERID;
             radio->sendACK();
-           // Serial.print(" - ACK sent.");
+            // Serial.print(" - ACK sent.");
 
             // When a node requests an ACK, respond to the ACK
             // and also send a packet requesting an ACK (every 3rd one only)

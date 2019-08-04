@@ -2,14 +2,13 @@
 var now = new Date();
 var timenow = now.getHours() + (now.getMinutes() / 60);
 var days = {
-    0: 'sun',
-    1: 'mon',
-    2: 'tue',
-    3: 'wed',
-    4: 'thu',
-    5: 'fri',
-    6: 'sat',
-    7: 'sun'
+    0: 'mon',
+    1: 'tue',
+    2: 'wed',
+    3: 'thu',
+    4: 'fri',
+    5: 'sat',
+    6: 'sun'
 };
 // FIXME
 function getName(id) {
@@ -33,12 +32,18 @@ function setState(msg) {
 var today = days[now.getDay()];
 
 var wb_url = 'ws://casa.powet.eu:65530/'; // esp8266.local
+var wb_url = 'ws://192.168.1.102:81/';
 
 var connection = new WebSocket(wb_url);
 connection.onopen = function () {
     console.log("connected...");
-    updateclock();
+
+    var cmd = new Object();
+    cmd.event = "get_schedule";
+    var json = JSON.stringify(cmd);
+    connection.send(json);
     setState("connected");
+    updateclock();
 
 };
 connection.onerror = function (error) {
@@ -256,14 +261,14 @@ function update() {
             var resultInSeconds = Math.round(difference / 6000);
 
             var div=document.createElement("div");
-           div.setAttribute("align","left");
+            div.setAttribute("align","left");
 
             var checkbox = document.createElement('input');
             checkbox.type = "checkbox";
             checkbox.onclick = function(){
-               // this.onclick = null;
+                // this.onclick = null;
                 //var label = this.parentNode;
-               // label.removeChild(this);
+                // label.removeChild(this);
                 //label.parentNode.removeChild(label);
                 var cmd = new Object();
                 cmd.event = "thermostat_selected";
