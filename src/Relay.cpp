@@ -10,7 +10,7 @@ Relay::Relay() {
 }
 
 void Relay::setup() {
-    Serial.println("[INFO] Relay setup()");
+    Serial.println(F("[INFO] Relay setup()"));
     pinMode(RELAY_PIN, OUTPUT);
     digitalWrite(RELAY_PIN,LOW); // TODO: check if mandatory
 }

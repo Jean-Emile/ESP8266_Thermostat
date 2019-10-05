@@ -30,7 +30,8 @@ String WebServerHandler::getContentType(String filename){
 }
 
 bool WebServerHandler::handleFileRead(String path) { // send the right file to the client (if it exists)
-    Serial.println("handleFileRead: " + path);
+    Serial.print(F("handleFileRead: "));
+    Serial.println(path);
     if (path.endsWith("/")) path += "login.html";          // If a folder is requested, send the index file
     String contentType = getContentType(path);             // Get the MIME type
     String pathWithGz = path + ".gz";
@@ -64,7 +65,7 @@ void WebServerHandler::handleFileUpload(){ // upload a new file to the SPIFFS
             if(SPIFFS.exists(pathWithGz))                      // version of that file must be deleted (if it exists)
                 SPIFFS.remove(pathWithGz);
         }
-        Serial.print("handleFileUpload Name: "); Serial.println(path);
+        Serial.print(F("handleFileUpload Name: ")); Serial.println(path);
         fsUploadFile = SPIFFS.open(path, "w");            // Open the file for writing in SPIFFS (create if it doesn't exist)
         path = String();
     } else if(upload.status == UPLOAD_FILE_WRITE){
@@ -73,7 +74,7 @@ void WebServerHandler::handleFileUpload(){ // upload a new file to the SPIFFS
     } else if(upload.status == UPLOAD_FILE_END){
         if(fsUploadFile) {                                    // If the file was successfully created
             fsUploadFile.close();                               // Close the file again
-            Serial.print("handleFileUpload Size: "); Serial.println(upload.totalSize);
+            Serial.print(F("handleFileUpload Size: ")); Serial.println(upload.totalSize);
             server->sendHeader("Location","/success.html");      // Redirect the client to the success page
             server->send(303);
         } else {
@@ -87,7 +88,7 @@ void WebServerHandler::handleFileUpload(){ // upload a new file to the SPIFFS
 
 void WebServerHandler::setup() { // Start a HTTP server with a file read handler and an upload handler
 
-    Serial.println("[INFO] WebServer setup()");
+    Serial.println(F("[INFO] WebServer setup()"));
 
     this->server->on("/ota.html",  HTTP_POST, [&]() {  // If a POST request is sent to the /ota.html address,
          server->send(200, "text/plain", "");
@@ -98,7 +99,7 @@ void WebServerHandler::setup() { // Start a HTTP server with a file read handler
     server->onNotFound(std::bind(&WebServerHandler::handleNotFound, this));
 
     this->server->begin();                             // start the HTTP server
-    Serial.println("[INFO] HTTP server started.");
+    Serial.println(F("[INFO] HTTP server started."));
 }
 
 void WebServerHandler::update() {

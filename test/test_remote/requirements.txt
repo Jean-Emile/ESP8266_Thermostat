@@ -1,1 +1,2 @@
-pip install websocket_client
+websocket_client
+paho-mqtt==1.2

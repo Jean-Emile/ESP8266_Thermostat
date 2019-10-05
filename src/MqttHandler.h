@@ -31,7 +31,7 @@ private:
     const char* mqttUser;
     const char* mqttPassword;
     void callback(char* topic, byte* payload, unsigned int length);
-
+    int counterRetry;
     double timeRetry;
 
 };

@@ -6,7 +6,7 @@
 #define ESP8266_THERMOSTAT_SENSORS_H
 
 #include <NTPClient.h> // get it here https://github.com/arduino-libraries/NTPClient
-#define  MAX_SENSORS 20
+#define  MAX_SENSORS 15 //#FIXME c'est pas le max mais indice
 
 class Node {
 public:

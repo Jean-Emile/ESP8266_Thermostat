@@ -27,14 +27,6 @@ public:
     int mqttPort;
     int tz;
 
-    char mailServer[20];
-    char mailUser[32];
-    char mailPassword[32];
-    char mailfrom[64];
-    char mailto[64];
-    int mailPort;
-
-
 private:
     String formatBytes(size_t bytes);
 

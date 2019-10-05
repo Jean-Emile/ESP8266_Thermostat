@@ -12,6 +12,7 @@
 #include <ArduinoJson.h>
 #include <Time.h> // get it here https://github.com/PaulStoffregen/Time/tree/v1.5
 
+#include "Gsender.h" // mailer
 #include "Relay.h"
 #include "Sensors.h"
 
@@ -76,8 +77,11 @@ public:
     void setMode(int mode);
     bool loadConfiguration();
     bool saveConfiguration(int target);
+    bool saveSchedule(int dow,int sched);
+    bool saveDaySchedule(int dow);
     NTPClient *ntpClient;
     WeekSchedule thermostatSchedule;
+    bool validateSchedule(JsonArray &schedule);
 private:
     void handle(int current_t, int setpoint);
 
@@ -92,7 +96,6 @@ private:
     int thermostatHysteresisLow;
     int thermostatHysteresisHigh;
     unsigned long lastUpdate;
-
 };
 
 

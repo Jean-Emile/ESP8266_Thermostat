@@ -19,7 +19,7 @@ RF69Handler::~RF69Handler() {
 }
 
 void RF69Handler::setup() {
-    Serial.println("[INFO] RF69Handler setup()");
+    Serial.println(F("[INFO] RF69Handler setup()"));
     // Hard Reset the RFM module
     pinMode(RFM69_RST, OUTPUT);
     digitalWrite(RFM69_RST, HIGH);
@@ -28,7 +28,7 @@ void RF69Handler::setup() {
     delay(100);
     // Initialize radio
     if (!radio->initialize(FREQUENCY,NODEID,NETWORKID)) {
-        Serial.println("radio.initialize failed!");
+        Serial.println(F("radio.initialize failed!"));
     }
     if (IS_RFM69HCW) {
         radio->setHighPower(true);    // Only for RFM69HCW & HW!
@@ -39,11 +39,11 @@ void RF69Handler::setup() {
     //radio->setPowerLevel(10);
 
     pinMode(LED, OUTPUT);
-    Serial.print("\nFreq at ");
+    Serial.print(F("\nFreq at "));
     Serial.print(FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
-    Serial.println(" MHz");
-    Serial.print("Network "); Serial.print(NETWORKID);
-    Serial.print(" Node "); Serial.println(NODEID); Serial.println();
+    Serial.println(F(" MHz"));
+    Serial.print(F("Network ")); Serial.print(NETWORKID);
+    Serial.print(F(" Node ")); Serial.println(NODEID); Serial.println();
 }
 
 void RF69Handler::update() {
@@ -62,21 +62,21 @@ void RF69Handler::update() {
         //   Serial.println(sizeof(Payload));
 
         if (radio->DATALEN != sizeof(Payload))
-            Serial.print("Invalid payload received, not matching Payload struct!");
+            Serial.print(F("Invalid payload received, not matching Payload struct!"));
         else
         {
             theData = *(Payload*)radio->DATA; //assume radio.DATA actually contains our struct and not something else
-            Serial.print(" nodeId=");
+            Serial.print(F(" nodeId="));
             Serial.print(theData.nodeId);
             // Serial.print(" uptime=");
             //Serial.print(theData.uptime);
-            Serial.print(" temp=");
+            Serial.print(F(" temp="));
             Serial.print(theData.temp);
-            Serial.print(" hum=");
+            Serial.print(F(" hum="));
             Serial.print(theData.humidity);
-            Serial.print(" bat=");
+            Serial.print(F(" bat="));
             Serial.print(theData.battery);
-            Serial.print(" pulse=");
+            Serial.print(F(" pulse="));
             Serial.print(theData.pulsecount);
 
             sensors->updateValue(theData.nodeId,SENSOR_TYPE_TEMPERATURE,(int)theData.temp);

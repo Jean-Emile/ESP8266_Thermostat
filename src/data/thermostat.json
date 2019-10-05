@@ -2,8 +2,8 @@
   "relay":0,
   "state":0,
   "mode":0,
-  "manualsetpoint":1900,
-  "hysteresLow": 50,
-  "hysteresHigh": 50,
+  "manualsetpoint":2100,
+  "hysteresLow": 25,
+  "hysteresHigh": 25,
   "selectedSensor":0
 }

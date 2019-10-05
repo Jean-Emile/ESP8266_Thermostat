@@ -18,11 +18,11 @@ void Gsender::setup(const char *smtpServer, const char * login, const char * pas
   this->smtpPort = port;
   this->to = to;
 
-  Serial.print("smtpServer: ");
+  Serial.print(F("smtpServer: "));
   Serial.print(this->smtpServer);
-  Serial.print(" login: ");
+  Serial.print(F(" login: "));
   Serial.print(this->emailBase64Login);
-  Serial.print(" port: ");
+  Serial.print(F(" port: "));
   Serial.println(this->smtpPort);
 
 }
@@ -138,12 +138,12 @@ bool Gsender::Send(const String &to, const String &message)
   client.println("From: <" + String(from) + '>');
   client.println("To: <" + to + '>');
   
-  client.print("Subject: ");
+  client.print(F("Subject: "));
   client.println(_subject);
   
-  client.println("Mime-Version: 1.0");
-  client.println("Content-Type: text/html; charset=\"UTF-8\"");
-  client.println("Content-Transfer-Encoding: 7bit");
+  client.println(F("Mime-Version: 1.0"));
+  client.println(F("Content-Type: text/html; charset=\"UTF-8\""));
+  client.println(F("Content-Transfer-Encoding: 7bit"));
   client.println();
   String body = "<!DOCTYPE html><html lang=\"en\">" + message + "</html>";
   client.println(body);
@@ -152,7 +152,7 @@ bool Gsender::Send(const String &to, const String &message)
     _error = "Sending message error";
     return false;
   }
-  client.println("QUIT");
+  client.println(F("QUIT"));
   if (!AwaitSMTPResponse(client, "221")) {
     _error = "SMTP QUIT error";
     return false;

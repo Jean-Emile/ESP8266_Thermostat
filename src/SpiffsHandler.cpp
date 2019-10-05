@@ -20,18 +20,16 @@ SpiffsHandler::~SpiffsHandler() {
 bool SpiffsHandler::loadConfiguration() {
     File configFile = SPIFFS.open("/config.json", "r");
     if (!configFile) {
-        Serial.println("[CRITICAL] Failed to open config file");
+        Serial.println(F("[CRITICAL] Failed to open config file"));
         return false;
     }
 
     size_t size = configFile.size();
     if (size > 450) {
-        Serial.println("[CRITICAL] Config file size is too large");
+        Serial.println(F("[CRITICAL] Config file size is too large"));
         return false;
     }
-    Serial.println(size);
-
-    // Allocate a buffer to store contents of the file.
+     // Allocate a buffer to store contents of the file.
     std::unique_ptr<char[]> buf(new char[size]);
 
     configFile.readBytes(buf.get(), size);
@@ -40,7 +38,9 @@ bool SpiffsHandler::loadConfiguration() {
 
 
     if (error) {
-        Serial.println("[WARNING] Failed to parse config file");
+        Serial.println(F("[WARNING] Failed to parse config file"));
+        config.clear();
+        configFile.close();
         return false;
     }
 
@@ -54,32 +54,26 @@ bool SpiffsHandler::loadConfiguration() {
     this->mqttPort = config["mqtt"]["port"];
 
     this->tz = config["ntp"]["tz"];
-    // SMTP
-    strcpy(this->mailServer,config["mail"]["server"]);
-    strcpy(this->mailUser,config["mail"]["login"]);
-    strcpy(this->mailPassword,config["mail"]["password"]);
-    strcpy(this->mailfrom,config["mail"]["from"]);
-    strcpy(this->mailfrom,config["mail"]["to"]);
-    this->mailPort = config["mail"]["port"];
-
-
-
+    config.clear();
+    configFile.close();
     return true;
 }
 
 bool SpiffsHandler::saveConfiguration() {
-    StaticJsonDocument<200> json;
+    DynamicJsonDocument json(200);
     json["ssid"] = "";
     json["wpwd"] = "";
 
     // TODO
     File configFile = SPIFFS.open("/config.json", "w");
     if (!configFile) {
-        Serial.println("Failed to open config file for writing");
+        Serial.println(F("Failed to open config file for writing"));
         return false;
     }
 
     serializeJson(json, configFile);
+    json.clear();
+    configFile.close();
     return true;
 }
 
@@ -98,8 +92,8 @@ String SpiffsHandler::formatBytes(size_t bytes) { // convert sizes in bytes to K
 void SpiffsHandler::setup() {
 
     SPIFFS.begin();                             // Start the SPI Flash File System (SPIFFS)
-    Serial.println("[INFO] WebSocketHandler setup()");
-    Serial.println("SPIFFS started. Contents:");
+    Serial.println(F("[INFO] WebSocketHandler setup()"));
+    Serial.println(F("SPIFFS started. Contents:"));
     {
         Dir dir = SPIFFS.openDir("/");
         while (dir.next()) {                      // List the file system contents

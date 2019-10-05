@@ -2,13 +2,13 @@
 var now = new Date();
 var timenow = now.getHours() + (now.getMinutes() / 60);
 var days = {
-    0: 'mon',
-    1: 'tue',
-    2: 'wed',
-    3: 'thu',
-    4: 'fri',
-    5: 'sat',
-    6: 'sun'
+    1: 'mon',
+    2: 'tue',
+    3: 'wed',
+    4: 'thu',
+    5: 'fri',
+    6: 'sat',
+    0: 'sun'
 };
 // FIXME
 function getName(id) {
@@ -16,8 +16,10 @@ function getName(id) {
         return "Elisa"
     }else if(id == 7){
         return "Salon"
-    }else if(id == 0){
+    }else if(id == 10){
         return "Cuisine";
+    }else if(id == 3){
+        return "Outside";
     }else
     {
         return "Node_"+id;
@@ -31,9 +33,7 @@ function setState(msg) {
 }
 var today = days[now.getDay()];
 
-var wb_url = 'ws://casa.powet.eu:65530/'; // esp8266.local
-var wb_url = 'ws://192.168.1.102:81/';
-
+var wb_url = 'ws://esp8266.local:81/';
 var connection = new WebSocket(wb_url);
 connection.onopen = function () {
     console.log("connected...");
@@ -74,6 +74,7 @@ connection.onmessage = function (e) {
 
         delete json["event"];
         schedule = json;
+        console.log(schedule)
 
         for (var d in schedule) {
             for (var z in schedule[d]) {
@@ -126,6 +127,7 @@ var thermostat = {
     manualsetpoint: 0,
     mode: 0,
     boardtime: "",
+    free_stack: "",
     selected: 0,
     hysteresis_h:50,
     hysteresis_l:50
@@ -225,7 +227,7 @@ function update() {
         now = new Date();
         timenow = now.getHours() + (now.getMinutes() / 60);
         today = days[now.getDay()];
-
+     
         checkVisibility();
 
 
@@ -235,7 +237,7 @@ function update() {
         }
 
         var aps = document.getElementById("boardtime");
-        aps.innerHTML =    "Board Time: "+thermostat.boardtime;
+        aps.innerHTML =    "Board Time: "+thermostat.boardtime+" Free Stack: "+thermostat.free_stack;
 
 
         var thermostat1hysteresishigh = document.getElementById("thermostat1hysteresishigh");
@@ -743,13 +745,13 @@ function save(param, payload) {
     } else if (param == "thermostat_schedule") {
         // TODO:
         var strtointdays = {
-            'mon': 0,
-            'tue': 1,
-            'wed': 2,
-            'thu': 3,
-            'fri': 4,
-            'sat': 5,
-            'sun': 6
+            'mon': 1,
+            'tue': 2,
+            'wed': 3,
+            'thu': 4,
+            'fri': 5,
+            'sat': 6,
+            'sun': 0
         };
 
         cmd["day"] = strtointdays[day];
